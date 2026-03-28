@@ -1,0 +1,1 @@
+const fs=require("fs");fs.writeFileSync("src/App.jsx","import{useState,useEffect,useCallback}from\"react\";import\"./App.css\";export default function App(){const[s,setS]=useState(\"menu\");return(<div className=\"app minimal\"><div className=\"center-content\"><h1>Bug Hunter</h1><button onClick={()=>setS(\"play\")}>Play</button></div></div>)}");console.log("ok")
