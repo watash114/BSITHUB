@@ -41,6 +41,10 @@ body.hide-timestamps .message .time {
     display: none;
 }
 
+.hidden {
+    display: none !important;
+}
+
 body.reduce-motion * {
     animation: none !important;
     transition: none !important;
@@ -1122,6 +1126,9 @@ main {
     justify-content: center;
     line-height: 1;
 }
+.notif-count-badge.hidden {
+    display: none;
+}
 .notif-dropdown {
     position: absolute;
     top: calc(100% + 8px);
@@ -1134,6 +1141,9 @@ main {
     border-radius: 12px;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
     z-index: 1000;
+}
+.notif-dropdown.hidden {
+    display: none;
 }
 .notif-header {
     display: flex;
