@@ -1,6 +1,8 @@
 let token = localStorage.getItem("bsithub-token") || "";
 let currentUser = null;
 let posts = [];
+let feedPage = 1;
+let feedTotalPages = 1;
 let messages = [];
 
 let syncTimer = null;
@@ -429,13 +431,23 @@ function startSync() {
 
 async function refreshAll() {
     await refreshSettings();
-    await Promise.all([refreshPosts(), refreshMessages(), refreshPresence(), refreshProfile(), refreshNotifications()]);
+    feedPage = 1;
+    await Promise.all([refreshPosts(1), refreshMessages(), refreshPresence(), refreshProfile(), refreshNotifications()]);
     await api("/api/presence/ping", { method: "POST" });
 }
 
-async function refreshPosts() {
-    const result = await api("/api/posts");
-    posts = result.posts || [];
+async function refreshPosts(page) {
+    const targetPage = page || 1;
+    const result = await api(`/api/posts?page=${targetPage}&limit=10`);
+    feedPage = result.page || 1;
+    feedTotalPages = result.totalPages || 1;
+
+    if (targetPage === 1) {
+        posts = result.posts || [];
+    } else {
+        const newPosts = result.posts || [];
+        posts = [...posts, ...newPosts];
+    }
     renderFeed();
 }
 
@@ -761,7 +773,7 @@ function renderFeed() {
         return;
     }
 
-    feed.innerHTML = posts
+    const postsHtml = posts
         .map((post) => {
             const commentsHtml = post.comments.length
                 ? post.comments
@@ -772,10 +784,19 @@ function renderFeed() {
                     .join("")
                 : '<div class="comment-meta">No comments yet.</div>';
 
+            const likeCount = post.likes || 0;
+            const liked = post.liked ? "liked" : "";
+
             return `<article class="post-card">
-                <div class="post-meta">${escapeHtml(post.author)} - ${formatDate(post.createdAt)}</div>
+                <div class="post-meta"><span class="post-author-link" onclick="viewUserProfile('${escapeHtml(post.author)}')">${escapeHtml(post.author)}</span> - ${formatDate(post.createdAt)}</div>
                 <h4 class="post-title">${escapeHtml(post.title)}</h4>
                 <p class="post-body">${escapeHtml(post.content)}</p>
+                <div class="post-actions">
+                    <button class="like-btn ${liked}" onclick="toggleLike(${post.id})">
+                        <span class="like-icon">${post.liked ? "❤️" : "🤍"}</span>
+                        <span class="like-count">${likeCount}</span>
+                    </button>
+                </div>
                 <div class="comments">${commentsHtml}</div>
                 <div class="comment-input-wrap">
                     <input id="commentInput-${post.id}" type="text" placeholder="Write a comment..." maxlength="300">
@@ -784,6 +805,35 @@ function renderFeed() {
             </article>`;
         })
         .join("");
+
+    const loadMoreHtml = feedPage < feedTotalPages
+        ? `<div class="load-more-wrap"><button class="load-more-btn" onclick="loadMorePosts()">Load More</button><span class="load-more-info">Page ${feedPage} of ${feedTotalPages}</span></div>`
+        : "";
+
+    feed.innerHTML = postsHtml + loadMoreHtml;
+}
+
+async function loadMorePosts() {
+    if (feedPage >= feedTotalPages) return;
+    await refreshPosts(feedPage + 1);
+}
+
+async function toggleLike(postId) {
+    try {
+        const result = await api(`/api/posts/${postId}/like`, { method: "POST" });
+        const post = posts.find((p) => p.id === postId);
+        if (post) {
+            post.liked = result.liked;
+            post.likes = result.count;
+            renderFeed();
+        }
+    } catch {
+        // no-op
+    }
+}
+
+function viewUserProfile(username) {
+    alert("Profile view for @" + username + " coming soon!");
 }
 
 async function createPost() {
@@ -809,7 +859,8 @@ async function createPost() {
         });
         titleInput.value = "";
         contentInput.value = "";
-        await Promise.all([refreshPosts(), refreshProfile()]);
+        feedPage = 1;
+        await Promise.all([refreshPosts(1), refreshProfile()]);
     } catch (error) {
         postError.textContent = error.message;
     }

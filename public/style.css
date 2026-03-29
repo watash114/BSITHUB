@@ -376,6 +376,80 @@ main {
     border: 1px solid rgba(30, 255, 195, 0.3);
 }
 
+.post-actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 0.6rem;
+}
+
+.like-btn {
+    background: transparent;
+    border: 1px solid rgba(30, 255, 195, 0.2);
+    border-radius: 20px;
+    padding: 0.3rem 0.8rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    color: #c8dce8;
+    font-size: 0.88rem;
+    transition: all 0.2s;
+}
+
+.like-btn:hover {
+    background: rgba(255, 100, 100, 0.1);
+    border-color: rgba(255, 100, 100, 0.4);
+}
+
+.like-btn.liked {
+    border-color: rgba(255, 100, 100, 0.5);
+    background: rgba(255, 100, 100, 0.1);
+    color: #ff9999;
+}
+
+.like-icon {
+    font-size: 1rem;
+}
+
+.post-author-link {
+    color: #1effc3;
+    cursor: pointer;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+.post-author-link:hover {
+    color: #00ff99;
+}
+
+.load-more-wrap {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    padding: 1.2rem;
+}
+
+.load-more-btn {
+    padding: 0.7rem 1.8rem;
+    background: rgba(30, 255, 195, 0.15);
+    border: 1px solid rgba(30, 255, 195, 0.3);
+    border-radius: 10px;
+    color: #1effc3;
+    cursor: pointer;
+    font-size: 0.95rem;
+    transition: all 0.2s;
+}
+
+.load-more-btn:hover {
+    background: rgba(30, 255, 195, 0.25);
+}
+
+.load-more-info {
+    font-size: 0.82rem;
+    color: #6b8299;
+}
+
 #chatPage:not(.hidden) {
     display: grid;
     grid-template-columns: 1fr 230px;

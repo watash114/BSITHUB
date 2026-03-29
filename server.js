@@ -210,6 +210,13 @@ async function initDb() {
             created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
         );
 
+        CREATE TABLE IF NOT EXISTS post_likes (
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            post_id INTEGER NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            PRIMARY KEY (user_id, post_id)
+        );
+
         CREATE UNIQUE INDEX IF NOT EXISTS users_username_lower_unique
             ON users ((LOWER(username)));
 
@@ -591,16 +598,27 @@ app.put("/api/profile/me", auth, async (req, res) => {
     return res.json({ ok: true, user: safeUser(updated.rows[0]) });
 });
 
-app.get("/api/posts", auth, async (_req, res) => {
+app.get("/api/posts", auth, async (req, res) => {
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(50, Math.max(1, parseInt(req.query.limit) || 10));
+    const offset = (page - 1) * limit;
+
+    const countResult = await pool.query("SELECT COUNT(*)::int AS total FROM posts");
+    const total = countResult.rows[0].total;
+    const totalPages = Math.max(1, Math.ceil(total / limit));
+
     const postsResult = await pool.query(
         `SELECT p.id, p.title, p.content, p.created_at, u.username AS author
          FROM posts p
          JOIN users u ON u.id = p.author_id
-         ORDER BY p.id DESC`
+         ORDER BY p.id DESC
+         LIMIT $1 OFFSET $2`,
+        [limit, offset]
     );
 
     const postIds = postsResult.rows.map((row) => row.id);
     let commentsByPost = new Map();
+    let likesByPost = new Map();
 
     if (postIds.length) {
         const commentsResult = await pool.query(
@@ -623,6 +641,19 @@ app.get("/api/posts", auth, async (_req, res) => {
                 author: row.author
             });
         }
+
+        const likesResult = await pool.query(
+            `SELECT post_id, COUNT(*)::int AS count,
+                    BOOL_OR(user_id = $2) AS liked
+             FROM post_likes
+             WHERE post_id = ANY($1::int[])
+             GROUP BY post_id`,
+            [postIds, req.user.id]
+        );
+
+        for (const row of likesResult.rows) {
+            likesByPost.set(row.post_id, { count: row.count, liked: row.liked });
+        }
     }
 
     const posts = postsResult.rows.map((row) => ({
@@ -631,10 +662,12 @@ app.get("/api/posts", auth, async (_req, res) => {
         content: row.content,
         createdAt: row.created_at,
         author: row.author,
-        comments: commentsByPost.get(row.id) || []
+        comments: commentsByPost.get(row.id) || [],
+        likes: likesByPost.get(row.id)?.count || 0,
+        liked: likesByPost.get(row.id)?.liked || false
     }));
 
-    return res.json({ posts });
+    return res.json({ posts, page, totalPages, total });
 });
 
 app.post("/api/posts", auth, async (req, res) => {
@@ -705,6 +738,35 @@ app.post("/api/posts/:postId/comments", auth, async (req, res) => {
             author: req.user.username
         }
     });
+});
+
+app.post("/api/posts/:postId/like", auth, async (req, res) => {
+    const postId = Number(req.params.postId);
+    if (!Number.isInteger(postId)) {
+        return res.status(400).json({ error: "Invalid post id" });
+    }
+
+    const postExists = await pool.query("SELECT id FROM posts WHERE id = $1 LIMIT 1", [postId]);
+    if (!postExists.rows.length) {
+        return res.status(404).json({ error: "Post not found" });
+    }
+
+    const existing = await pool.query(
+        "SELECT user_id FROM post_likes WHERE user_id = $1 AND post_id = $2",
+        [req.user.id, postId]
+    );
+
+    let liked;
+    if (existing.rows.length) {
+        await pool.query("DELETE FROM post_likes WHERE user_id = $1 AND post_id = $2", [req.user.id, postId]);
+        liked = false;
+    } else {
+        await pool.query("INSERT INTO post_likes (user_id, post_id) VALUES ($1, $2)", [req.user.id, postId]);
+        liked = true;
+    }
+
+    const countResult = await pool.query("SELECT COUNT(*)::int AS count FROM post_likes WHERE post_id = $1", [postId]);
+    return res.json({ liked, count: countResult.rows[0].count });
 });
 
 app.get("/api/messages", auth, async (_req, res) => {
@@ -937,12 +999,6 @@ app.delete("/api/notifications/:notificationId", auth, async (req, res) => {
 });
 
 
-app.use(express.static(path.join(__dirname, "public")));
-
-
-app.get("*", (_req, res) => {
-    res.sendFile(path.join(__dirname, "public", "index.html"));
-});
 
 
 
@@ -958,4 +1014,12 @@ async function start() {
     }
 }
 
-start();
+initDb().catch(err => {
+    console.error("DB init error:", err);
+});
+
+if (require.main === module) {
+    start();
+}
+
+module.exports = app;
