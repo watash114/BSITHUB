@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BSITHUB - BSIT Student Community</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="modal" id="authModal">
+        <div class="modal-content">
+            <h2>BSITHUB</h2>
+            <p>BSIT Student Community</p>
+            <div class="auth-tabs">
+                <button class="tab active" onclick="showTab('login')" id="loginTabBtn">Login</button>
+                <button class="tab" onclick="showTab('register')" id="registerTabBtn">Register</button>
+            </div>
+            <div id="loginForm" class="auth-form">
+                <input type="text" id="loginUsername" placeholder="Username" maxlength="20">
+                <input type="password" id="loginPassword" placeholder="Password" maxlength="40">
+                <button onclick="login()">Login</button>
+                <p id="loginError" class="error"></p>
+                <p id="loginSuccess" class="success"></p>
+                <button type="button" class="text-btn" onclick="toggleForgotPassword(true)">Forgot password?</button>
+            </div>
+            <div id="forgotForm" class="auth-form hidden">
+                <p class="auth-hint">Enter your email to receive a reset code.</p>
+                <input type="email" id="forgotEmail" placeholder="Email">
+                <button onclick="sendResetCode()">Send Reset Code</button>
+                <input type="text" id="resetCode" placeholder="6-digit code" maxlength="6">
+                <input type="password" id="resetPasswordInput" placeholder="New password" maxlength="40">
+                <input type="password" id="resetConfirmInput" placeholder="Confirm new password" maxlength="40">
+                <button onclick="resetPassword()">Reset Password</button>
+                <p id="forgotError" class="error"></p>
+                <p id="forgotSuccess" class="success"></p>
+                <button type="button" class="text-btn" onclick="toggleForgotPassword(false)">Back to Login</button>
+            </div>
+            <div id="registerForm" class="auth-form hidden">
+                <input type="text" id="registerUsername" placeholder="Username" maxlength="20">
+                <input type="email" id="registerEmail" placeholder="Email">
+                <select id="registerYear">
+                    <option value="BSIT 1">BSIT 1</option>
+                    <option value="BSIT 2">BSIT 2</option>
+                    <option value="BSIT 3">BSIT 3</option>
+                    <option value="BSIT 4">BSIT 4</option>
+                </select>
+                <input type="password" id="registerPassword" placeholder="Password" maxlength="40">
+                <input type="password" id="registerConfirm" placeholder="Confirm Password" maxlength="40">
+                <button onclick="register()">Register</button>
+                <p id="registerError" class="error"></p>
+                <p id="registerSuccess" class="success"></p>
+            </div>
+        </div>
+    </div>
+
+    <div class="app" id="app" style="display: none;">
+        <header>
+            <div class="logo">
+                <h1>BSITHUB</h1>
+                <span>BSIT Community Hub</span>
+            </div>
+
+            <nav>
+                <button id="navFeed" class="nav-btn active" onclick="showPage('feed')">Feed</button>
+                <button id="navChat" class="nav-btn" onclick="showPage('chat')">Chat</button>
+                <button id="navProfile" class="nav-btn" onclick="showPage('profile')">Profile</button>
+                <button id="navSettings" class="nav-btn" onclick="showPage('settings')">Settings</button>
+                <button id="navAdmin" class="nav-btn hidden" onclick="showPage('admin')">Admin</button>
+            </nav>
+
+            <div class="notif-bell-wrap">
+                <button class="notif-bell-btn" id="notifBellBtn" onclick="toggleNotifications()" title="Notifications">
+                    <span>🔔</span>
+                    <span class="notif-count-badge hidden" id="notifCountBadge">0</span>
+                </button>
+                <div class="notif-dropdown hidden" id="notifDropdown">
+                    <div class="notif-header">
+                        <h4>Notifications</h4>
+                        <button class="text-btn" onclick="markAllRead()">Mark all read</button>
+                    </div>
+                    <div class="notif-list" id="notifList">
+                        <div class="notif-empty" id="notifEmpty">No notifications yet</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="user-info">
+                <span id="currentUser"></span><span id="headerAdminBadge" class="role-badge admin" style="display:none">ADMIN</span>
+                <button onclick="logout()" class="logout-btn">Logout</button>
+            </div>
+        </header>
+
+        <main>
+            <section id="feedPage" class="page">
+                <div class="feed-layout">
+                    <aside class="feed-profile">
+                        <div class="profile-card compact">
+                            <div class="avatar" id="feedProfileAvatar">
+                                <img class="avatar-image" id="feedProfileAvatarImage" alt="Feed profile picture">
+                                <span class="avatar-fallback" id="feedProfileAvatarFallback"></span>
+                            </div>
+                            <div class="profile-meta">
+                                <h2 id="feedProfileUsername"></h2>
+                                <p id="feedProfileBio"></p>
+                                <p id="feedProfileEmail" class="muted"></p>
+                            </div>
+                        </div>
+                        <div class="stats feed-stats">
+                            <div class="stat-box">
+                                <span id="feedStatPosts" class="stat-value">0</span>
+                                <span class="stat-label">Posts</span>
+                            </div>
+                            <div class="stat-box">
+                                <span id="feedStatComments" class="stat-value">0</span>
+                                <span class="stat-label">Comments</span>
+                            </div>
+                        </div>
+                        <button class="text-btn" type="button" onclick="showPage('profile')">Open Full Profile</button>
+                    </aside>
+
+                    <div class="feed-main">
+                        <div class="feed-toolbar">
+                            <h3>Create Post</h3>
+                            <button type="button" class="text-btn" onclick="openSearchPage()">Search Posts</button>
+                        </div>
+                        <div class="post-form">
+                            <input type="text" id="postTitle" placeholder="Post title" maxlength="100">
+                            <textarea id="postContent" placeholder="Share something with BSIT students..." maxlength="1000"></textarea>
+                            <button onclick="createPost()">Post</button>
+                            <p id="postError" class="error"></p>
+                        </div>
+                        <div id="feed" class="feed"></div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="chatPage" class="page hidden">
+                <div class="chat-container">
+                    <div class="messages" id="messages"></div>
+                    <div class="chat-tools hidden" id="chatTools">
+                        <div class="emoji-row">
+                            <button type="button" class="emoji-btn" onclick="insertEmoji('😀')">😀</button>
+                            <button type="button" class="emoji-btn" onclick="insertEmoji('😂')">😂</button>
+                            <button type="button" class="emoji-btn" onclick="insertEmoji('🔥')">🔥</button>
+                            <button type="button" class="emoji-btn" onclick="insertEmoji('❤️')">❤️</button>
+                            <button type="button" class="emoji-btn" onclick="insertEmoji('👍')">👍</button>
+                            <button type="button" class="emoji-btn" onclick="insertEmoji('🎉')">🎉</button>
+                        </div>
+                    </div>
+                    <div class="chat-attachment" id="chatAttachment"></div>
+                    <div class="gif-picker hidden" id="gifPicker">
+                        <div class="gif-picker-top">
+                            <input type="text" id="gifSearchInput" placeholder="Search GIFs">
+                            <button type="button" class="chat-mini-btn" onclick="toggleGifPicker(false)">✕</button>
+                        </div>
+                        <div class="gif-grid" id="gifGrid"></div>
+                    </div>
+                    <div class="input-container">
+                        <div class="chat-left-actions">
+                            <button type="button" class="chat-mini-btn" title="Voice" aria-label="Voice">🎤</button>
+                            <button type="button" class="chat-mini-btn" title="Photo" aria-label="Photo" onclick="openChatImagePicker()">🖼️</button>
+                            <button type="button" class="chat-mini-btn" title="GIF" aria-label="GIF" onclick="toggleGifPicker()">GIF</button>
+                        </div>
+                        <div class="chat-input-pill">
+                            <input type="text" id="messageInput" placeholder="Aa" maxlength="500">
+                            <button type="button" class="chat-mini-btn" id="chatToolsToggle" title="Emoji" aria-label="Emoji" onclick="toggleChatTools()">😊</button>
+                        </div>
+                        <button id="chatSendBtn" class="chat-send-btn" onclick="sendMessage()" aria-label="Send">👍</button>
+                        <input id="chatImageInput" type="file" accept="image/*" class="hidden-file-input">
+                    </div>
+                </div>
+                <aside class="sidebar">
+                    <h3>Online Students</h3>
+                    <ul id="userList"></ul>
+                </aside>
+            </section>
+
+            <section id="profilePage" class="page hidden">
+                <div class="profile-hero">
+                    <div class="profile-hero-main">
+                        <div class="avatar profile-hero-avatar" id="profileAvatar">
+                            <img class="avatar-image" id="profileAvatarImage" alt="Profile picture">
+                            <span class="avatar-fallback" id="profileAvatarFallback"></span>
+                        </div>
+                        <div class="profile-hero-meta">
+                            <h2 id="profileDisplayName"></h2><span id="adminBadge" class="role-badge" style="display:none">ADMIN</span>
+                            <p class="profile-follow-line">
+                                <span id="profileFollowers"></span> followers • <span id="profileFollowing"></span> following
+                            </p>
+                            <p id="profileTagline" class="profile-tagline"></p>
+                            <p class="profile-contact-line"><span id="profileRole"></span> • <span id="profileHandle"></span></p>
+                        </div>
+                    </div>
+                    <div class="profile-hero-actions">
+                        <button type="button" class="text-btn muted-btn" onclick="toggleProfileSearch()">Search</button>
+                        <button type="button" class="text-btn muted-btn" onclick="showPage('settings')">Settings</button>
+                        <button type="button" class="edit-btn" onclick="toggleEditProfile()">Edit Profile</button>
+                    </div>
+                </div>
+
+                <div class="profile-nav-strip">
+                    <button type="button" class="profile-tab active" data-tab="all" onclick="showProfileTab('all')">All</button>
+                    <button type="button" class="profile-tab" data-tab="about" onclick="showProfileTab('about')">About</button>
+                    <button type="button" class="profile-tab" data-tab="friends" onclick="showProfileTab('friends')">Friends</button>
+                    <button type="button" class="profile-tab" data-tab="photos" onclick="showProfileTab('photos')">Photos</button>
+                </div>
+
+                <div class="profile-grid-layout">
+                    <aside class="profile-left-column">
+                        <div class="profile-panel">
+                            <h3>Personal details</h3>
+                            <div class="profile-detail-item">
+                                <span class="detail-icon">🎓</span>
+                                <div class="detail-text-wrap">
+                                    <span class="detail-label">Year level</span>
+                                    <span id="profileDetailYear" class="detail-value"></span>
+                                </div>
+                            </div>
+                            <div class="profile-detail-item">
+                                <span class="detail-icon">📅</span>
+                                <div class="detail-text-wrap">
+                                    <span class="detail-label">Member since</span>
+                                    <span id="profileDetailSince" class="detail-value"></span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="profile-panel">
+                            <h3>Contact info</h3>
+                            <div class="profile-detail-item">
+                                <span class="detail-icon">✉️</span>
+                                <div class="detail-text-wrap">
+                                    <span class="detail-label">Email</span>
+                                    <span id="profileDetailEmail" class="detail-value"></span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="stats profile-stats">
+                            <div class="stat-box">
+                                <span id="statPosts" class="stat-value">0</span>
+                                <span class="stat-label">Posts</span>
+                            </div>
+                            <div class="stat-box">
+                                <span id="statComments" class="stat-value">0</span>
+                                <span class="stat-label">Comments</span>
+                            </div>
+                        </div>
+
+                        <div class="edit-profile hidden" id="editProfilePanel">
+                            <h3>Edit Profile</h3>
+                            <input type="text" id="editBio" placeholder="Update bio" maxlength="60">
+                            <input type="email" id="editEmail" placeholder="Update email">
+                            <input type="password" id="editPassword" placeholder="New password (optional)" maxlength="40">
+                            <div class="avatar-edit-row">
+                                <label class="text-btn file-btn">
+                                    <input id="editAvatarInput" type="file" accept="image/*">
+                                    Upload Profile Picture
+                                </label>
+                                <button type="button" class="text-btn" onclick="clearAvatarSelection()">Remove Photo</button>
+                            </div>
+                            <img id="editAvatarPreview" class="avatar-preview hidden" alt="Profile picture preview">
+                            <button onclick="saveProfile()">Save Profile</button>
+                            <p id="editError" class="error"></p>
+                            <p id="editSuccess" class="success"></p>
+                        </div>
+                    </aside>
+
+                    <div class="profile-right-column">
+                        <div class="profile-posts-card">
+                            <div class="profile-posts-head">
+                                <h3 id="profilePostsTitle">Posts</h3>
+                                <button type="button" class="text-btn muted-btn">Filters</button>
+                            </div>
+                            <input id="profileSearchInput" class="profile-search-input hidden" type="text" placeholder="Search your posts">
+                            <div id="myPosts" class="my-posts"></div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="settingsPage" class="page hidden">
+                <div class="settings-layout">
+                    <div class="settings-card">
+                        <h3>Privacy</h3>
+                        <label class="setting-row"><input type="checkbox" id="settingPublicProfile"> Public profile</label>
+                        <label class="setting-row"><input type="checkbox" id="settingAllowMessages"> Allow messages</label>
+                    </div>
+
+                    <div class="settings-card">
+                        <h3>Notifications</h3>
+                        <label class="setting-row"><input type="checkbox" id="settingEmailNotifications"> Email notifications</label>
+                        <label class="setting-row"><input type="checkbox" id="settingShowTimestamps"> Show chat timestamps</label>
+                    </div>
+
+                    <div class="settings-card">
+                        <h3>Experience</h3>
+                        <label class="setting-row"><input type="checkbox" id="settingEnterToSend"> Enter to send chat</label>
+                        <label class="setting-row"><input type="checkbox" id="settingReduceMotion"> Reduce motion</label>
+                    </div>
+
+                    <div class="settings-actions">
+                        <button type="button" class="text-btn" onclick="resetSettingsToDefaults()">Reset Defaults</button>
+                        <button type="button" class="edit-btn" onclick="saveSettings()">Save Settings</button>
+                    </div>
+                    <p id="settingsError" class="error"></p>
+                    <p id="settingsSuccess" class="success"></p>
+                </div>
+            </section>
+
+            <section id="adminPage" class="page hidden">
+                <div class="admin-layout">
+                    <div class="admin-header">
+                        <h2>Admin Panel</h2>
+                        <p>Manage posts, users, and comments across BSITHUB.</p>
+                    </div>
+                    <div class="admin-tabs">
+                        <button class="admin-tab active" data-tab="posts" onclick="showAdminTab('posts')">Posts</button>
+                        <button class="admin-tab" data-tab="users" onclick="showAdminTab('users')">Users</button>
+                        <button class="admin-tab" data-tab="comments" onclick="showAdminTab('comments')">Comments</button>
+                    </div>
+                    <div id="adminContent">
+                        <div class="admin-loading">Loading...</div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="searchPage" class="page hidden">
+                <div class="search-layout">
+                    <div class="search-header">
+                        <h2>Search Posts</h2>
+                        <button type="button" class="text-btn" onclick="showPage('feed')">Back to Feed</button>
+                    </div>
+                    <form class="search-form" onsubmit="submitSearch(event)">
+                        <div class="search-row">
+                            <input type="text" id="searchQuery" placeholder="Search posts by keyword...">
+                            <button type="submit" class="search-btn">Search</button>
+                            <button type="button" class="text-btn" onclick="clearSearch()">Clear</button>
+                        </div>
+                        <div class="filter-row">
+                            <select id="filterAuthor">
+                                <option value="">All Authors</option>
+                            </select>
+                            <select id="filterYear">
+                                <option value="">All Year Levels</option>
+                                <option value="BSIT 1">BSIT 1</option>
+                                <option value="BSIT 2">BSIT 2</option>
+                                <option value="BSIT 3">BSIT 3</option>
+                                <option value="BSIT 4">BSIT 4</option>
+                            </select>
+                            <input type="date" id="filterDateFrom" placeholder="From date">
+                            <input type="date" id="filterDateTo" placeholder="To date">
+                        </div>
+                    </form>
+                    <div id="searchResults"></div>
+                    <div id="searchPagination" class="pagination"></div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
