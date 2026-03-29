@@ -9,6 +9,12 @@ let pendingProfileAvatarData = null;
 let profileAvatarChanged = false;
 let pendingChatImageData = null;
 let pendingGifUrl = null;
+let pendingVoiceData = null;
+let isRecording = false;
+let mediaRecorder = null;
+let recordedChunks = [];
+let recordingDuration = 0;
+let recordingTimer = null;
 const MAX_UPLOAD_IMAGE_BYTES = 2 * 1024 * 1024;
 let chatToolsOpen = false;
 let gifPickerOpen = false;
@@ -861,6 +867,12 @@ function renderMessages() {
                 <img class="message-image" src="${message.gifUrl}" alt="GIF from ${safeAuthor}">
                 <div class="time">${timeText}</div>
             `;
+        } else if (message.type === "voice" && message.voiceDataUrl) {
+            div.innerHTML = `
+                <div class="username">${safeAuthor}</div>
+                <audio class="voice-message" controls src="${message.voiceDataUrl}"></audio>
+                <div class="time">${timeText}</div>
+            `;
         } else {
             div.innerHTML = `<div class="username">${safeAuthor}</div><div class="text">${safeText}</div><div class="time">${timeText}</div>`;
         }
@@ -879,11 +891,11 @@ async function sendMessage() {
     const input = document.getElementById("messageInput");
     let content = input.value.trim();
 
-    if (!content && !pendingChatImageData && !pendingGifUrl) {
+    if (!content && !pendingChatImageData && !pendingGifUrl && !pendingVoiceData) {
         content = "👍";
     }
 
-    const type = pendingChatImageData ? "image" : pendingGifUrl ? "gif" : "text";
+    const type = pendingChatImageData ? "image" : pendingGifUrl ? "gif" : pendingVoiceData ? "voice" : "text";
 
     try {
         await api("/api/messages", {
@@ -892,7 +904,8 @@ async function sendMessage() {
                 content,
                 type,
                 imageDataUrl: pendingChatImageData,
-                gifUrl: pendingGifUrl
+                gifUrl: pendingGifUrl,
+                voiceDataUrl: pendingVoiceData
             }
         });
         input.value = "";
@@ -1001,6 +1014,143 @@ function openChatImagePicker() {
     }
 }
 
+async function startVoiceRecording() {
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        recordedChunks = [];
+        mediaRecorder = new MediaRecorder(stream, { mimeType: getSupportedMimeType() });
+        mediaRecorder.ondataavailable = (event) => {
+            if (event.data && event.data.size > 0) {
+                recordedChunks.push(event.data);
+            }
+        };
+        mediaRecorder.onstop = async () => {
+            stream.getTracks().forEach((track) => track.stop());
+            if (recordedChunks.length === 0) {
+                return;
+            }
+            const blob = new Blob(recordedChunks, { type: mediaRecorder.mimeType || "audio/webm" });
+            const base64 = await blobToBase64(blob);
+            pendingVoiceData = base64;
+            setChatAttachment(`🎤 Voice (${formatDuration(recordingDuration)})`, true);
+            updateVoiceButton();
+        };
+        mediaRecorder.start();
+        isRecording = true;
+        recordingDuration = 0;
+        recordingTimer = setInterval(() => {
+            recordingDuration++;
+            updateRecordingIndicator();
+        }, 1000);
+        updateVoiceButton();
+        toggleGifPicker(false);
+        const indicator = document.getElementById("voiceRecordingIndicator");
+        if (indicator) {
+            indicator.classList.remove("hidden");
+        }
+    } catch (err) {
+        console.error("Microphone access denied:", err);
+        alert("Microphone access is required for voice messages. Please allow microphone access in your browser settings.");
+    }
+}
+
+function stopRecording() {
+    if (mediaRecorder && isRecording) {
+        mediaRecorder.stop();
+        isRecording = false;
+        if (recordingTimer) {
+            clearInterval(recordingTimer);
+            recordingTimer = null;
+        }
+        updateVoiceButton();
+        const indicator = document.getElementById("voiceRecordingIndicator");
+        if (indicator) {
+            indicator.classList.add("hidden");
+        }
+    }
+}
+
+function cancelRecording() {
+    if (mediaRecorder && isRecording) {
+        mediaRecorder.ondataavailable = null;
+        mediaRecorder.onstop = null;
+        mediaRecorder.stop();
+        isRecording = false;
+        recordedChunks = [];
+        recordingDuration = 0;
+        if (recordingTimer) {
+            clearInterval(recordingTimer);
+            recordingTimer = null;
+        }
+        updateVoiceButton();
+        const indicator = document.getElementById("voiceRecordingIndicator");
+        if (indicator) {
+            indicator.classList.add("hidden");
+        }
+    }
+}
+
+function getSupportedMimeType() {
+    const types = ["audio/webm;codecs=opus", "audio/webm", "audio/ogg;codecs=opus", "audio/mp4"];
+    for (const type of types) {
+        if (MediaRecorder.isTypeSupported(type)) {
+            return type;
+        }
+    }
+    return "audio/webm";
+}
+
+function blobToBase64(blob) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+    });
+}
+
+function formatDuration(seconds) {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
+function updateRecordingIndicator() {
+    const indicator = document.getElementById("voiceRecordingIndicator");
+    if (indicator) {
+        indicator.textContent = `Recording ${formatDuration(recordingDuration)}`;
+    }
+}
+
+function updateVoiceButton() {
+    const btn = document.getElementById("voiceBtn");
+    if (!btn) return;
+
+    if (isRecording) {
+        btn.textContent = "⏹️";
+        btn.title = "Stop recording";
+        btn.classList.add("recording");
+    } else if (pendingVoiceData) {
+        btn.textContent = "🎤";
+        btn.title = "Send voice message";
+        btn.classList.remove("recording");
+    } else {
+        btn.textContent = "🎤";
+        btn.title = "Record voice message";
+        btn.classList.remove("recording");
+    }
+}
+
+function onVoiceButtonClick() {
+    if (isRecording) {
+        stopRecording();
+    } else if (pendingVoiceData) {
+        sendMessage();
+    } else {
+        startVoiceRecording();
+    }
+}
+
 function setChatAttachment(label, showClear) {
     const attachment = document.getElementById("chatAttachment");
     if (!attachment) {
@@ -1026,9 +1176,18 @@ function clearPendingGif() {
     pendingGifUrl = null;
 }
 
+function clearPendingVoice() {
+    pendingVoiceData = null;
+    if (isRecording) {
+        stopRecording();
+    }
+    updateVoiceButton();
+}
+
 function clearChatAttachment() {
     clearChatImage();
     clearPendingGif();
+    clearPendingVoice();
     setChatAttachment("", false);
     updateChatComposerState();
 }
