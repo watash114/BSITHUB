@@ -832,8 +832,51 @@ async function toggleLike(postId) {
     }
 }
 
-function viewUserProfile(username) {
-    alert("Profile view for @" + username + " coming soon!");
+async function viewUserProfile(username) {
+    const feed = document.getElementById("feed");
+    feed.innerHTML = '<div class="post-card">Loading profile...</div>';
+
+    try {
+        const result = await api(`/api/users/${username}`);
+        const user = result.user;
+        const stats = result.stats;
+        const posts = result.recentPosts || [];
+        const yearLevel = user.yearLevel || "BSIT Student";
+        const isAdmin = user.role === "admin";
+        const joinedDate = new Date(user.createdAt).toLocaleDateString();
+
+        const postsHtml = posts.length
+            ? posts.map((p) => `<div class="my-post-card"><strong>${escapeHtml(p.title)}</strong><div class="muted">${formatDate(p.createdAt)}</div></div>`).join("")
+            : '<div class="my-post-card empty-posts">No posts yet</div>';
+
+        feed.innerHTML = `
+            <div class="user-profile-card">
+                <div class="profile-hero" style="padding: 1rem;">
+                    <div class="profile-hero-main">
+                        <div class="avatar profile-hero-avatar" style="width:80px;height:80px;font-size:1.8rem;">
+                            <span class="avatar-fallback" style="display:flex;">${user.username.slice(0,1).toUpperCase()}</span>
+                        </div>
+                        <div class="profile-hero-meta">
+                            <h2>${escapeHtml(user.username)} ${isAdmin ? '<span class="role-badge admin">ADMIN</span>' : ""}</h2>
+                            <p class="profile-tagline">${escapeHtml(user.bio || "BSIT Student")} - ${escapeHtml(yearLevel)}</p>
+                            <p class="profile-contact-line muted">Joined ${joinedDate}</p>
+                        </div>
+                    </div>
+                    <div style="display:flex;gap:1rem;padding:0.8rem 0;">
+                        <div class="stat-box"><span class="stat-value">${stats.posts}</span><span class="stat-label">Posts</span></div>
+                        <div class="stat-box"><span class="stat-value">${stats.comments}</span><span class="stat-label">Comments</span></div>
+                    </div>
+                </div>
+                <div style="padding: 0 1rem 1rem;">
+                    <button class="text-btn" onclick="showPage('feed')">← Back to Feed</button>
+                    <h3 style="margin: 1rem 0 0.5rem;">${escapeHtml(user.username)}'s Posts</h3>
+                    ${postsHtml}
+                </div>
+            </div>
+        `;
+    } catch (error) {
+        feed.innerHTML = `<div class="post-card">Could not load profile: ${escapeHtml(error.message)}<br><button class="text-btn" onclick="showPage('feed')">← Back to Feed</button></div>`;
+    }
 }
 
 async function createPost() {

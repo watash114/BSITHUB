@@ -450,6 +450,13 @@ main {
     color: #6b8299;
 }
 
+.user-profile-card {
+    background: rgba(14, 30, 46, 0.6);
+    border: 1px solid rgba(30, 255, 195, 0.15);
+    border-radius: 12px;
+    margin-bottom: 0.8rem;
+}
+
 #chatPage:not(.hidden) {
     display: grid;
     grid-template-columns: 1fr 230px;

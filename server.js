@@ -475,6 +475,46 @@ app.get("/api/profile/me", auth, async (req, res) => {
     });
 });
 
+app.get("/api/users/:username", auth, async (req, res) => {
+    const username = String(req.params.username || "").trim();
+    if (!username) return res.status(400).json({ error: "Username required" });
+
+    const userResult = await pool.query(
+        "SELECT id, username, email, bio, year_level, avatar_image, created_at, role FROM users WHERE LOWER(username) = LOWER($1) LIMIT 1",
+        [username]
+    );
+    if (!userResult.rows.length) return res.status(404).json({ error: "User not found" });
+
+    const user = userResult.rows[0];
+    const postsCountResult = await pool.query("SELECT COUNT(*)::int AS count FROM posts WHERE author_id = $1", [user.id]);
+    const commentsCountResult = await pool.query("SELECT COUNT(*)::int AS count FROM comments WHERE author_id = $1", [user.id]);
+    const recentPostsResult = await pool.query(
+        `SELECT id, title, created_at FROM posts WHERE author_id = $1 ORDER BY id DESC LIMIT 10`,
+        [user.id]
+    );
+
+    return res.json({
+        user: {
+            id: user.id,
+            username: user.username,
+            bio: user.bio,
+            yearLevel: user.year_level,
+            avatarImage: user.avatar_image,
+            createdAt: user.created_at,
+            role: user.role
+        },
+        stats: {
+            posts: postsCountResult.rows[0].count,
+            comments: commentsCountResult.rows[0].count
+        },
+        recentPosts: recentPostsResult.rows.map((row) => ({
+            id: row.id,
+            title: row.title,
+            createdAt: row.created_at
+        }))
+    });
+});
+
 app.get("/api/settings/me", auth, async (req, res) => {
     const settings = await getOrCreateSettings(req.user.id);
     return res.json({ settings });
