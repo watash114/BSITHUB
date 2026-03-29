@@ -157,7 +157,7 @@
                     </div>
                     <div class="input-container">
                         <div class="chat-left-actions">
-                            <button type="button" class="chat-mini-btn" title="Voice" aria-label="Voice">🎤</button>
+                            <button type="button" class="chat-mini-btn" id="voiceBtn" title="Record voice message" aria-label="Voice" onclick="onVoiceButtonClick()">🎤</button>
                             <button type="button" class="chat-mini-btn" title="Photo" aria-label="Photo" onclick="openChatImagePicker()">🖼️</button>
                             <button type="button" class="chat-mini-btn" title="GIF" aria-label="GIF" onclick="toggleGifPicker()">GIF</button>
                         </div>
@@ -168,6 +168,7 @@
                         <button id="chatSendBtn" class="chat-send-btn" onclick="sendMessage()" aria-label="Send">👍</button>
                         <input id="chatImageInput" type="file" accept="image/*" class="hidden-file-input">
                     </div>
+                    <div class="voice-recording-indicator hidden" id="voiceRecordingIndicator"></div>
                 </div>
                 <aside class="sidebar">
                     <h3>Online Students</h3>

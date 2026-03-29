@@ -397,7 +397,8 @@ async function openApp() {
         document.getElementById("navAdmin").classList.add("hidden");
     }
 
-    showPage("feed");
+    const lastPage = localStorage.getItem("bsithub-last-page") || "feed";
+    showPage(lastPage);
     await refreshAll();
     startSync();
 }
@@ -770,6 +771,8 @@ function showPage(page) {
         document.getElementById("searchResults").innerHTML = '<div class="post-card">Enter a search term and filters to find posts.</div>';
         document.getElementById("searchPagination").innerHTML = "";
     }
+
+    localStorage.setItem("bsithub-last-page", page);
 }
 
 function renderFeed() {
