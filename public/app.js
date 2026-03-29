@@ -1038,11 +1038,12 @@ async function onChatImageSelected(event) {
     }
     if (!file.type.startsWith("image/")) {
         clearChatImage();
+        setChatAttachment("Please select an image file (PNG, JPG, GIF, WEBP).", false);
         return;
     }
     if (file.size > MAX_UPLOAD_IMAGE_BYTES) {
         clearChatImage();
-        setChatAttachment("Image too large (max 2MB)", false);
+        setChatAttachment("Image too large (max 2MB). Try a smaller file.", false);
         return;
     }
 
@@ -1055,7 +1056,7 @@ async function onChatImageSelected(event) {
         updateChatComposerState();
     } catch {
         clearChatImage();
-        setChatAttachment("Failed to load image", false);
+        setChatAttachment("Could not load image. The file may be corrupted.", false);
     }
 }
 
@@ -1106,11 +1107,12 @@ async function onAvatarSelected(event) {
     }
     if (!file.type.startsWith("image/")) {
         event.target.value = "";
+        document.getElementById("editError").textContent = "Please select an image file (PNG, JPG, GIF, WEBP).";
         return;
     }
     if (file.size > MAX_UPLOAD_IMAGE_BYTES) {
         event.target.value = "";
-        document.getElementById("editError").textContent = "Image too large (max 2MB).";
+        document.getElementById("editError").textContent = "Image too large (max 2MB). Try a smaller file.";
         return;
     }
 
@@ -1123,7 +1125,7 @@ async function onAvatarSelected(event) {
         document.getElementById("editError").textContent = "";
     } catch {
         event.target.value = "";
-        document.getElementById("editError").textContent = "Failed to read selected image.";
+        document.getElementById("editError").textContent = "Could not load image. The file may be corrupted.";
     }
 }
 
