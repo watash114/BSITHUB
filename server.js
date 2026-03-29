@@ -998,8 +998,11 @@ app.delete("/api/notifications/:notificationId", auth, async (req, res) => {
     return res.json({ ok: true });
 });
 
+app.use(express.static(path.join(__dirname, "public")));
 
-
+app.get("*", (_req, res) => {
+    res.sendFile(path.join(__dirname, "public", "index.html"));
+});
 
 
 async function start() {
