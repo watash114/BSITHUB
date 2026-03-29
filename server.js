@@ -15,6 +15,7 @@ const ONLINE_TIMEOUT_SECONDS = 60;
 const RESET_CODE_TTL_MINUTES = 10;
 const MAX_IMAGE_DATA_URL_LENGTH = 3 * 1024 * 1024;
 const MAX_GIF_URL_LENGTH = 2048;
+const MAX_VOICE_DATA_URL_LENGTH = 5 * 1024 * 1024;
 
 const SMTP_HOST = process.env.SMTP_HOST;
 const SMTP_PORT = Number(process.env.SMTP_PORT || 0);
@@ -161,6 +162,7 @@ async function initDb() {
             message_type TEXT NOT NULL DEFAULT 'text',
             image_data_url TEXT,
             gif_url TEXT,
+            voice_data_url TEXT,
             created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
         );
 
@@ -172,6 +174,9 @@ async function initDb() {
 
         ALTER TABLE messages
             ADD COLUMN IF NOT EXISTS gif_url TEXT;
+
+        ALTER TABLE messages
+            ADD COLUMN IF NOT EXISTS voice_data_url TEXT;
 
         CREATE TABLE IF NOT EXISTS presence (
             user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
@@ -813,7 +818,7 @@ app.get("/api/messages", auth, async (_req, res) => {
     const result = await pool.query(
         `SELECT *
          FROM (
-            SELECT m.id, m.content, m.created_at, m.message_type, m.image_data_url, m.gif_url, u.username AS author
+            SELECT m.id, m.content, m.created_at, m.message_type, m.image_data_url, m.gif_url, m.voice_data_url, u.username AS author
             FROM messages m
             JOIN users u ON u.id = m.author_id
             ORDER BY m.id DESC
@@ -829,6 +834,7 @@ app.get("/api/messages", auth, async (_req, res) => {
             type: row.message_type || "text",
             imageDataUrl: row.image_data_url || null,
             gifUrl: row.gif_url || null,
+            voiceDataUrl: row.voice_data_url || null,
             createdAt: row.created_at,
             author: row.author
         }))
@@ -840,13 +846,15 @@ app.post("/api/messages", auth, async (req, res) => {
     const type = String(req.body.type || "text").trim().toLowerCase();
     const imageDataUrlInput = req.body.imageDataUrl;
     const gifUrlInput = req.body.gifUrl;
+    const voiceDataUrlInput = req.body.voiceDataUrl;
 
-    if (!["text", "image", "gif"].includes(type)) {
+    if (!["text", "image", "gif", "voice"].includes(type)) {
         return res.status(400).json({ error: "Invalid message type" });
     }
 
     let imageDataUrl = null;
     let gifUrl = null;
+    let voiceDataUrl = null;
     if (type === "image") {
         if (typeof imageDataUrlInput !== "string" || !imageDataUrlInput.trim().startsWith("data:image/")) {
             return res.status(400).json({ error: "Image message requires a valid image" });
@@ -863,6 +871,14 @@ app.post("/api/messages", auth, async (req, res) => {
         if (gifUrl.length > MAX_GIF_URL_LENGTH) {
             return res.status(400).json({ error: "GIF URL is too long" });
         }
+    } else if (type === "voice") {
+        if (typeof voiceDataUrlInput !== "string" || !voiceDataUrlInput.trim().startsWith("data:audio/")) {
+            return res.status(400).json({ error: "Voice message requires valid audio data" });
+        }
+        voiceDataUrl = voiceDataUrlInput.trim();
+        if (voiceDataUrl.length > MAX_VOICE_DATA_URL_LENGTH) {
+            return res.status(400).json({ error: "Voice message is too large" });
+        }
     }
 
     if (type === "text" && !content) {
@@ -870,16 +886,16 @@ app.post("/api/messages", auth, async (req, res) => {
     }
 
     const created = await pool.query(
-        `INSERT INTO messages (author_id, content, message_type, image_data_url, gif_url)
-         VALUES ($1, $2, $3, $4, $5)
-         RETURNING id, content, message_type, image_data_url, gif_url, created_at`,
-        [req.user.id, content || "", type, imageDataUrl, gifUrl]
+        `INSERT INTO messages (author_id, content, message_type, image_data_url, gif_url, voice_data_url)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         RETURNING id, content, message_type, image_data_url, gif_url, voice_data_url, created_at`,
+        [req.user.id, content || "", type, imageDataUrl, gifUrl, voiceDataUrl]
     );
 
     const row = created.rows[0];
     const allUsers = await pool.query("SELECT DISTINCT author_id FROM messages WHERE author_id != $1", [req.user.id]);
     for (const uid of allUsers.rows.map(function(r) { return r.author_id; })) {
-        await pool.query("INSERT INTO notifications (user_id, type, message, link) VALUES ($1, $2, $3, $4)", [uid, "message", req.user.username + " sent a message in chat", "#chat"]);
+        await pool.query("INSERT INTO notifications (user_id, type, message, link) VALUES ($1, $2, $3, $4)", [uid, "message", req.user.username + " sent a voice message", "#chat"]);
     }
     return res.status(201).json({
         message: {
@@ -888,6 +904,7 @@ app.post("/api/messages", auth, async (req, res) => {
             type: row.message_type || "text",
             imageDataUrl: row.image_data_url || null,
             gifUrl: row.gif_url || null,
+            voiceDataUrl: row.voice_data_url || null,
             createdAt: row.created_at,
             author: req.user.username
         }
