@@ -504,8 +504,6 @@ function setRoleBadge(role) {
     });
 }
 
-}
-
 async function refreshProfile() {
     const result = await api("/api/profile/me");
     currentUser = result.user;
