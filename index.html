@@ -1,48 +1,480 @@
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BSITHUB - Simple</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: Arial, sans-serif; background: #1a1a2e; color: white; padding: 20px; }
+        .hidden { display: none !important; }
+        
+        /* Auth */
+        #auth { max-width: 400px; margin: 50px auto; background: #252540; padding: 30px; border-radius: 10px; }
+        h1 { color: #1effc3; text-align: center; margin-bottom: 20px; }
+        input, button, select { width: 100%; padding: 12px; margin: 10px 0; border: none; border-radius: 5px; }
+        input { background: #1a1a2e; color: white; }
+        button { background: #1effc3; color: black; font-weight: bold; cursor: pointer; }
+        button:hover { opacity: 0.9; }
+        .link { color: #1effc3; cursor: pointer; text-align: center; margin-top: 15px; }
+        .error { color: #ff4444; margin: 10px 0; }
+        
+        /* App */
+        #app { display: none; }
+        header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid #333; }
+        nav button { width: auto; margin: 0 5px; background: #333; color: white; }
+        nav button.active { background: #1effc3; color: black; }
+        
+        /* Pages */
+        .page { display: none; }
+        .page.active { display: block; }
+        
+        /* Posts */
+        .post-box { background: #252540; padding: 20px; border-radius: 10px; margin-bottom: 20px; }
+        .post { background: #252540; padding: 20px; border-radius: 10px; margin-bottom: 15px; }
+        .post-header { color: #888; font-size: 14px; margin-bottom: 10px; }
+        .post-title { color: #1effc3; margin-bottom: 10px; }
+        .post-actions { margin-top: 15px; }
+        .post-actions button { width: auto; margin-right: 10px; background: #333; color: white; padding: 5px 15px; }
+        
+        /* Chat */
+        .chat-box { background: #252540; border-radius: 10px; height: 400px; display: flex; flex-direction: column; }
+        .messages { flex: 1; overflow-y: auto; padding: 20px; }
+        .message { margin: 10px 0; padding: 10px; border-radius: 10px; max-width: 70%; }
+        .message.me { background: #1effc3; color: black; margin-left: auto; }
+        .message.them { background: #333; }
+        .chat-input { display: flex; padding: 10px; border-top: 1px solid #333; }
+        .chat-input input { flex: 1; margin-right: 10px; }
+        .chat-input button { width: 100px; }
+        .conv-item { background: #252540; padding: 15px; border-radius: 5px; margin-bottom: 10px; cursor: pointer; }
+        .conv-item:hover { background: #333; }
+        
+        /* Profile */
+        .profile { text-align: center; padding: 30px; background: #252540; border-radius: 10px; }
+        .avatar { width: 80px; height: 80px; background: #1effc3; border-radius: 50%; margin: 0 auto 20px; display: flex; align-items: center; justify-content: center; font-size: 30px; color: black; }
+        .stats { display: flex; justify-content: center; gap: 30px; margin-top: 20px; }
+        .stat { text-align: center; }
+        .stat-value { font-size: 24px; color: #1effc3; }
+    </style>
+</head>
+<body>
+    <!-- AUTH -->
+    <div id="auth">
+        <h1>BSITHUB</h1>
+        
+        <div id="loginForm">
+            <input type="text" id="loginUser" placeholder="Username">
+            <input type="password" id="loginPass" placeholder="Password">
+            <div class="error" id="loginError"></div>
+            <button onclick="login()">Login</button>
+            <div class="link" onclick="showRegister()">Create Account</div>
+        </div>
+        
+        <div id="registerForm" class="hidden">
+            <input type="text" id="regUser" placeholder="Username">
+            <input type="email" id="regEmail" placeholder="Email">
+            <input type="password" id="regPass" placeholder="Password">
+            <select id="regYear">
+                <option value="">Year Level</option>
+                <option value="BSIT 1">BSIT 1</option>
+                <option value="BSIT 2">BSIT 2</option>
+                <option value="BSIT 3">BSIT 3</option>
+                <option value="BSIT 4">BSIT 4</option>
+            </select>
+            <div class="error" id="regError"></div>
+            <button onclick="register()">Create Account</button>
+            <div class="link" onclick="showLogin()">Back to Login</div>
+        </div>
+    </div>
     
-    <!-- PWA Meta Tags -->
-    <meta name="theme-color" content="#09090b" />
-    <meta name="description" content="Bug Hunter - Find bugs in code, earn coins, and learn programming!" />
-    <meta name="mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="apple-mobile-web-app-title" content="Bug Hunter" />
-    
-    <!-- Icons -->
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
-    <link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png" />
-    <link rel="apple-touch-icon" href="/icon-192.png" />
-    
-    <!-- Manifest -->
-    <link rel="manifest" href="/manifest.json" />
-    
-    <title>Bug Hunter</title>
+    <!-- APP -->
+    <div id="app">
+        <header>
+            <h2>BSITHUB</h2>
+            <nav>
+                <button class="active" onclick="showPage('feed')">Feed</button>
+                <button onclick="showPage('chat')">Chat</button>
+                <button onclick="showPage('profile')">Profile</button>
+                <button id="adminBtn" class="hidden" onclick="showPage('admin')">Admin</button>
+            </nav>
+            <div>
+                <span id="userDisplay"></span>
+                <button onclick="logout()" style="width: auto; margin-left: 10px; background: #ff4444; color: white;">Logout</button>
+            </div>
+        </header>
+        
+        <!-- FEED -->
+        <div id="feedPage" class="page active">
+            <div class="post-box">
+                <input type="text" id="postTitle" placeholder="Title (optional)">
+                <textarea id="postContent" rows="3" placeholder="What's on your mind?" style="width: 100%; padding: 12px; margin: 10px 0; border: none; border-radius: 5px; background: #1a1a2e; color: white; resize: vertical;"></textarea>
+                <button onclick="createPost()">Post</button>
+            </div>
+            <div id="postsList"></div>
+        </div>
+        
+        <!-- CHAT -->
+        <div id="chatPage" class="page">
+            <div id="conversationsList">
+                <div style="margin-bottom: 15px;">
+                    <input type="text" id="newChatUser" placeholder="Username to message" style="width: 300px; display: inline-block;">
+                    <button onclick="startChat()" style="width: auto; display: inline-block;">Start Chat</button>
+                </div>
+                <div id="convList"></div>
+            </div>
+            
+            <div id="chatRoom" class="hidden">
+                <button onclick="backToList()" style="width: auto; margin-bottom: 10px;">← Back</button>
+                <h3 id="chatTitle" style="margin-bottom: 15px;"></h3>
+                <div class="chat-box">
+                    <div class="messages" id="messagesList"></div>
+                    <div class="chat-input">
+                        <input type="text" id="msgInput" placeholder="Type message..." onkeypress="if(event.key==='Enter') sendMsg()">
+                        <button onclick="sendMsg()">Send</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- PROFILE -->
+        <div id="profilePage" class="page">
+            <div class="profile">
+                <div class="avatar" id="profileAvatar">?</div>
+                <h2 id="profileName"></h2>
+                <p id="profileYear" style="color: #888;"></p>
+                <div class="stats">
+                    <div class="stat">
+                        <div class="stat-value" id="postCount">0</div>
+                        <div>Posts</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-value" id="commentCount">0</div>
+                        <div>Comments</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- ADMIN -->
+        <div id="adminPage" class="page">
+            <h3 style="margin-bottom: 20px;">Admin Panel</h3>
+            <div id="adminList"></div>
+        </div>
+    </div>
     
     <script>
-      // Register Service Worker
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js')
-            .then(reg => console.log('SW registered'))
-            .catch(err => console.log('SW registration failed'));
-        });
-      }
-      
-      // Handle install prompt
-      let deferredPrompt;
-      window.addEventListener('beforeinstallprompt', (e) => {
-        e.preventDefault();
-        deferredPrompt = e;
-      });
+        const API = '/api';
+        let token = localStorage.getItem('bsithub-token');
+        let user = null;
+        let currentChat = null;
+        let refreshTimer = null;
+        
+        // API helper
+        async function api(url, opts = {}) {
+            const res = await fetch(API + url, {
+                ...opts,
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(token && { 'Authorization': 'Bearer ' + token }),
+                    ...opts.headers
+                },
+                body: opts.body ? JSON.stringify(opts.body) : undefined
+            });
+            if (!res.ok) throw new Error(await res.text());
+            return res.json();
+        }
+        
+        // Auth UI
+        function showRegister() {
+            document.getElementById('loginForm').classList.add('hidden');
+            document.getElementById('registerForm').classList.remove('hidden');
+        }
+        
+        function showLogin() {
+            document.getElementById('registerForm').classList.add('hidden');
+            document.getElementById('loginForm').classList.remove('hidden');
+        }
+        
+        // Login
+        async function login() {
+            try {
+                const data = await api('/auth/login', {
+                    method: 'POST',
+                    body: {
+                        username: document.getElementById('loginUser').value,
+                        password: document.getElementById('loginPass').value
+                    }
+                });
+                token = data.token;
+                user = data.user;
+                localStorage.setItem('bsithub-token', token);
+                startApp();
+            } catch (e) {
+                document.getElementById('loginError').textContent = e.message;
+            }
+        }
+        
+        // Register
+        async function register() {
+            try {
+                await api('/auth/register', {
+                    method: 'POST',
+                    body: {
+                        username: document.getElementById('regUser').value,
+                        email: document.getElementById('regEmail').value,
+                        password: document.getElementById('regPass').value,
+                        yearLevel: document.getElementById('regYear').value
+                    }
+                });
+                alert('Account created! Please login.');
+                showLogin();
+            } catch (e) {
+                document.getElementById('regError').textContent = e.message;
+            }
+        }
+        
+        // Logout
+        function logout() {
+            localStorage.removeItem('bsithub-token');
+            token = null;
+            user = null;
+            location.reload();
+        }
+        
+        // Start App
+        function startApp() {
+            document.getElementById('auth').classList.add('hidden');
+            document.getElementById('app').style.display = 'block';
+            document.getElementById('userDisplay').textContent = '@' + user.username;
+            
+            if (user.role === 'admin') {
+                document.getElementById('adminBtn').classList.remove('hidden');
+            }
+            
+            loadFeed();
+            loadProfile();
+        }
+        
+        // Show Page
+        function showPage(page) {
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+            
+            document.getElementById(page + 'Page').classList.add('active');
+            event.target.classList.add('active');
+            
+            if (page === 'feed') loadFeed();
+            if (page === 'chat') loadConversations();
+            if (page === 'profile') loadProfile();
+            if (page === 'admin') loadAdmin();
+        }
+        
+        // Load Feed
+        async function loadFeed() {
+            try {
+                const data = await api('/posts');
+                const html = data.posts.length === 0 
+                    ? '<p style="color: #888; text-align: center;">No posts yet</p>'
+                    : data.posts.map(p => `
+                        <div class="post">
+                            <div class="post-header">${p.author} • ${new Date(p.createdAt).toLocaleString()}</div>
+                            ${p.title ? `<div class="post-title">${escape(p.title)}</div>` : ''}
+                            <div>${escape(p.content)}</div>
+                            <div class="post-actions">
+                                <button onclick="likePost(${p.id})">❤️ ${p.likes || 0}</button>
+                                <button onclick="viewComments(${p.id})">💬 ${p.comments || 0}</button>
+                            </div>
+                        </div>
+                    `).join('');
+                document.getElementById('postsList').innerHTML = html;
+            } catch (e) {
+                console.error('Feed error:', e);
+            }
+        }
+        
+        // Create Post
+        async function createPost() {
+            try {
+                await api('/posts', {
+                    method: 'POST',
+                    body: {
+                        title: document.getElementById('postTitle').value,
+                        content: document.getElementById('postContent').value
+                    }
+                });
+                document.getElementById('postTitle').value = '';
+                document.getElementById('postContent').value = '';
+                loadFeed();
+            } catch (e) {
+                alert(e.message);
+            }
+        }
+        
+        // Like Post
+        async function likePost(id) {
+            try {
+                await api(`/posts/${id}/like`, { method: 'POST' });
+                loadFeed();
+            } catch (e) {
+                alert(e.message);
+            }
+        }
+        
+        // View Comments
+        function viewComments(id) {
+            alert('Comments for post ' + id);
+        }
+        
+        // Load Profile
+        async function loadProfile() {
+            document.getElementById('profileName').textContent = user.username;
+            document.getElementById('profileYear').textContent = user.yearLevel || 'BSIT Student';
+            document.getElementById('profileAvatar').textContent = user.username.charAt(0).toUpperCase();
+            
+            try {
+                const data = await api('/profile/me');
+                document.getElementById('postCount').textContent = data.postsCount || 0;
+                document.getElementById('commentCount').textContent = data.commentsCount || 0;
+            } catch (e) {
+                console.error('Profile error:', e);
+            }
+        }
+        
+        // Load Conversations
+        async function loadConversations() {
+            try {
+                const data = await api('/conversations');
+                const html = data.conversations.length === 0
+                    ? '<p style="color: #888;">No conversations. Start one below!</p>'
+                    : data.conversations.map(c => `
+                        <div class="conv-item" onclick="openChat(${c.id}, '${c.other_user}')">
+                            <strong>${c.other_user}</strong>
+                            <div style="color: #888; font-size: 14px;">${c.last_message || 'No messages'}</div>
+                        </div>
+                    `).join('');
+                document.getElementById('convList').innerHTML = html;
+            } catch (e) {
+                console.error('Conv error:', e);
+            }
+        }
+        
+        // Start Chat
+        async function startChat() {
+            const username = document.getElementById('newChatUser').value;
+            if (!username) return;
+            
+            try {
+                const data = await api('/conversations', {
+                    method: 'POST',
+                    body: { username }
+                });
+                openChat(data.conversation.id, username);
+            } catch (e) {
+                alert(e.message);
+            }
+        }
+        
+        // Open Chat
+        async function openChat(id, username) {
+            currentChat = id;
+            document.getElementById('conversationsList').classList.add('hidden');
+            document.getElementById('chatRoom').classList.remove('hidden');
+            document.getElementById('chatTitle').textContent = 'Chat with ' + username;
+            
+            await loadMessages();
+            
+            if (refreshTimer) clearInterval(refreshTimer);
+            refreshTimer = setInterval(loadMessages, 3000);
+        }
+        
+        // Back to List
+        function backToList() {
+            currentChat = null;
+            if (refreshTimer) clearInterval(refreshTimer);
+            document.getElementById('chatRoom').classList.add('hidden');
+            document.getElementById('conversationsList').classList.remove('hidden');
+            loadConversations();
+        }
+        
+        // Load Messages
+        async function loadMessages() {
+            if (!currentChat) return;
+            
+            try {
+                const data = await api(`/conversations/${currentChat}/messages`);
+                const html = data.messages.map(m => `
+                    <div class="message ${m.author === user.username ? 'me' : 'them'}">
+                        <div style="font-size: 12px; opacity: 0.7;">${m.author}</div>
+                        <div>${escape(m.content)}</div>
+                    </div>
+                `).join('');
+                document.getElementById('messagesList').innerHTML = html;
+                document.getElementById('messagesList').scrollTop = document.getElementById('messagesList').scrollHeight;
+            } catch (e) {
+                console.error('Messages error:', e);
+            }
+        }
+        
+        // Send Message
+        async function sendMsg() {
+            const input = document.getElementById('msgInput');
+            if (!input.value || !currentChat) return;
+            
+            try {
+                await api(`/conversations/${currentChat}/messages`, {
+                    method: 'POST',
+                    body: { content: input.value }
+                });
+                input.value = '';
+                loadMessages();
+            } catch (e) {
+                alert(e.message);
+            }
+        }
+        
+        // Load Admin
+        async function loadAdmin() {
+            try {
+                const data = await api('/admin/posts');
+                const html = data.posts.map(p => `
+                    <div class="post" style="display: flex; justify-content: space-between; align-items: center;">
+                        <div>${p.title || 'Untitled'} by ${p.author}</div>
+                        <button onclick="deletePost(${p.id})" style="background: #ff4444; color: white; width: auto;">Delete</button>
+                    </div>
+                `).join('');
+                document.getElementById('adminList').innerHTML = html;
+            } catch (e) {
+                console.error('Admin error:', e);
+            }
+        }
+        
+        // Delete Post
+        async function deletePost(id) {
+            if (!confirm('Delete?')) return;
+            try {
+                await api(`/admin/posts/${id}`, { method: 'DELETE' });
+                loadAdmin();
+            } catch (e) {
+                alert(e.message);
+            }
+        }
+        
+        // Escape HTML
+        function escape(text) {
+            if (!text) return '';
+            return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        }
+        
+        // Auto-login
+        if (token) {
+            api('/me').then(u => {
+                user = u;
+                startApp();
+            }).catch(() => {
+                localStorage.removeItem('bsithub-token');
+                token = null;
+            });
+        }
     </script>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
-  </body>
+</body>
 </html>
