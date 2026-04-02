@@ -719,19 +719,6 @@ function sendMessage(text) {
     renderMessages(activeChat.id);
     loadChats();
 }
-        status: 'read',
-        reactions: {},
-        edited: false,
-        starred: false,
-        replyTo: null,
-        forwarded: false
-    };
-    
-    messages.push(reply);
-    Storage.set('messages', messages);
-    renderMessages(activeChat.id);
-    loadChats();
-}
 
 function startNewChat() {
     var users = Storage.get('users') || [];
