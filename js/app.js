@@ -1826,6 +1826,13 @@ document.addEventListener('DOMContentLoaded', function() {
     initSettings();
     initRealtime();
     
+    // Initialize Firebase after a delay (wait for async SDK to load)
+    setTimeout(function() {
+        if (typeof initFirebaseMessaging === 'function') {
+            initFirebaseMessaging();
+        }
+    }, 2000);
+    
     // Register Service Worker for PWA
     if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('/sw.js')

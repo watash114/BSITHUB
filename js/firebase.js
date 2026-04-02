@@ -179,6 +179,7 @@ function listenForTypingIndicator(chatId, currentUserId, callback) {
 // Initialize Firebase on Load
 // ==========================================
 
-document.addEventListener('DOMContentLoaded', function() {
-    initFirebaseMessaging();
-});
+// Don't use DOMContentLoaded here - let app.js call initFirebaseMessaging
+// document.addEventListener('DOMContentLoaded', function() {
+//     initFirebaseMessaging();
+// });
