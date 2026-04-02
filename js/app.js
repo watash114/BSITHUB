@@ -1,7 +1,7 @@
 // ==========================================
-// BSITHUB v2.0.1 - Main Application
+// BSITHUB v2.5.0 - Main Application
 // ==========================================
-const APP_VERSION = '2.0.0';
+const APP_VERSION = '2.5.0';
 
 // ==========================================
 // Storage Manager
@@ -21,6 +21,122 @@ const Storage = {
         localStorage.removeItem(key);
     }
 };
+
+// ==========================================
+// Real-time Messaging (Cross-tab sync)
+// ==========================================
+let realtimeInterval = null;
+let lastMessageCount = 0;
+
+function initRealtime() {
+    // Listen for storage events from other tabs
+    window.addEventListener('storage', function(e) {
+        if (e.key === 'messages') {
+            handleNewMessages();
+        }
+        if (e.key === 'typingIndicator') {
+            handleTypingIndicator();
+        }
+        if (e.key === 'onlineUsers') {
+            updateOnlineStatus();
+        }
+    });
+    
+    // Also poll for updates every 2 seconds (backup)
+    realtimeInterval = setInterval(function() {
+        handleNewMessages();
+        handleTypingIndicator();
+        updateOnlineStatus();
+    }, 2000);
+}
+
+function handleNewMessages() {
+    if (!currentUser || !activeChat) return;
+    
+    var messages = Storage.get('messages') || [];
+    var chatMessages = messages.filter(function(m) { return m.chatId === activeChat.id; });
+    
+    if (chatMessages.length !== lastMessageCount) {
+        lastMessageCount = chatMessages.length;
+        renderMessages(activeChat.id);
+        updateChatList();
+    }
+}
+
+function updateChatList() {
+    if (currentUser) {
+        loadChats();
+    }
+}
+
+function handleTypingIndicator() {
+    if (!currentUser || !activeChat) return;
+    
+    var typingData = Storage.get('typingIndicator') || {};
+    var chatTyping = typingData[activeChat.id];
+    
+    if (chatTyping && chatTyping.userId !== currentUser.id) {
+        var users = Storage.get('users') || [];
+        var typingUser = users.find(function(u) { return u.id === chatTyping.userId; });
+        
+        if (typingUser && Date.now() - chatTyping.timestamp < 3000) {
+            document.getElementById('typing-indicator').style.display = 'flex';
+            document.getElementById('typing-indicator').querySelector('span').textContent = typingUser.name + ' is typing';
+        } else {
+            document.getElementById('typing-indicator').style.display = 'none';
+        }
+    } else {
+        document.getElementById('typing-indicator').style.display = 'none';
+    }
+}
+
+function sendTypingIndicator() {
+    if (!currentUser || !activeChat) return;
+    
+    var typingData = Storage.get('typingIndicator') || {};
+    typingData[activeChat.id] = {
+        userId: currentUser.id,
+        timestamp: Date.now()
+    };
+    Storage.set('typingIndicator', typingData);
+}
+
+function updateOnlineStatus() {
+    if (!currentUser) return;
+    
+    // Update current user's online status
+    var onlineUsers = Storage.get('onlineUsers') || {};
+    onlineUsers[currentUser.id] = Date.now();
+    Storage.set('onlineUsers', onlineUsers);
+    
+    // Update chat list with online indicators
+    document.querySelectorAll('.chat-item').forEach(function(item) {
+        var userId = item.dataset.userId;
+        if (userId) {
+            var lastSeen = onlineUsers[userId];
+            var isOnline = lastSeen && (Date.now() - lastSeen < 30000);
+            var avatarWrapper = item.querySelector('.chat-item-avatar-wrapper');
+            
+            if (avatarWrapper) {
+                var existingIndicator = avatarWrapper.querySelector('.online-indicator');
+                if (isOnline && !existingIndicator) {
+                    var indicator = document.createElement('div');
+                    indicator.className = 'online-indicator';
+                    avatarWrapper.appendChild(indicator);
+                } else if (!isOnline && existingIndicator) {
+                    existingIndicator.remove();
+                }
+            }
+        }
+    });
+}
+
+function setUserOffline() {
+    if (!currentUser) return;
+    var onlineUsers = Storage.get('onlineUsers') || {};
+    delete onlineUsers[currentUser.id];
+    Storage.set('onlineUsers', onlineUsers);
+}
 
 // Security: Simple hash function
 function hashPassword(password) {
@@ -205,6 +321,10 @@ function register(name, username, email, password) {
 }
 
 function logout() {
+    setUserOffline();
+    if (realtimeInterval) {
+        clearInterval(realtimeInterval);
+    }
     currentUser = null;
     Storage.remove('currentUser');
     showAuthPage();
@@ -433,7 +553,8 @@ function renderMessages(chatId) {
     var html = '';
     chatMessages.forEach(function(msg) {
         var isSent = msg.senderId === currentUser.id;
-        html += '<div class="message ' + (isSent ? 'sent' : 'received') + '">';
+        html += '<div class="message ' + (isSent ? 'sent' : 'received') + '" data-message-id="' + msg.id + '">';
+        html += '<div class="message-bubble">';
         
         // Check for GIF
         if (msg.gifUrl) {
@@ -456,7 +577,29 @@ function renderMessages(chatId) {
             html += '<div class="message-text">' + escapeHtml(msg.text) + '</div>';
         }
         
-        html += '<div class="message-time">' + formatTime(msg.timestamp) + '</div>';
+        // Reactions
+        if (msg.reactions && Object.keys(msg.reactions).length > 0) {
+            html += '<div class="message-reactions">';
+            var reactionCounts = {};
+            Object.values(msg.reactions).forEach(function(emoji) {
+                reactionCounts[emoji] = (reactionCounts[emoji] || 0) + 1;
+            });
+            Object.entries(reactionCounts).forEach(function(entry) {
+                html += '<span class="reaction-badge">' + entry[0] + ' ' + entry[1] + '</span>';
+            });
+            html += '</div>';
+        }
+        
+        html += '<div class="message-footer">';
+        html += '<span class="message-time">' + formatTime(msg.timestamp) + '</span>';
+        if (isSent) {
+            html += '<span class="message-status">' + (msg.status === 'read' ? '✓✓' : '✓') + '</span>';
+        }
+        html += '</div>';
+        
+        // Reaction button
+        html += '<button class="reaction-btn" onclick="showReactionPicker(\'' + msg.id + '\')">😀</button>';
+        html += '</div>';
         html += '</div>';
     });
     
@@ -466,6 +609,44 @@ function renderMessages(chatId) {
 
 function viewImage(src) {
     showModal('<div class="image-viewer"><img src="' + src + '" style="max-width:100%;max-height:80vh;"></div>');
+}
+
+function showReactionPicker(messageId) {
+    var reactions = ['❤️', '👍', '😂', '😮', '😢', '😡'];
+    var html = '<div class="reaction-picker">';
+    reactions.forEach(function(emoji) {
+        html += '<button class="reaction-option" onclick="addReaction(\'' + messageId + '\', \'' + emoji + '\')">' + emoji + '</button>';
+    });
+    html += '</div>';
+    
+    var messageEl = document.querySelector('[data-message-id="' + messageId + '"]');
+    if (messageEl) {
+        var existingPicker = messageEl.querySelector('.reaction-picker');
+        if (existingPicker) {
+            existingPicker.remove();
+        } else {
+            document.querySelectorAll('.reaction-picker').forEach(function(p) { p.remove(); });
+            var pickerDiv = document.createElement('div');
+            pickerDiv.innerHTML = html;
+            messageEl.querySelector('.message-bubble').appendChild(pickerDiv.firstElementChild);
+        }
+    }
+}
+
+function addReaction(messageId, emoji) {
+    var messages = Storage.get('messages') || [];
+    var message = messages.find(function(m) { return m.id === messageId; });
+    
+    if (message) {
+        if (!message.reactions) message.reactions = {};
+        message.reactions[currentUser.id] = emoji;
+        Storage.set('messages', messages);
+        
+        if (activeChat) {
+            renderMessages(activeChat.id);
+        }
+        showToast('Reacted with ' + emoji, 'info');
+    }
 }
 
 function sendMessage(text) {
@@ -1527,6 +1708,10 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     };
     
+    document.getElementById('message-input').oninput = function() {
+        sendTypingIndicator();
+    };
+    
     // Profile form
     document.getElementById('profile-form').onsubmit = function(e) {
         e.preventDefault();
@@ -1604,4 +1789,16 @@ document.addEventListener('DOMContentLoaded', function() {
     // Initialize
     initAuth();
     initSettings();
+    initRealtime();
+    
+    // Register Service Worker for PWA
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/sw.js')
+            .then(function(registration) {
+                console.log('Service Worker registered:', registration.scope);
+            })
+            .catch(function(error) {
+                console.log('Service Worker registration failed:', error);
+            });
+    }
 });

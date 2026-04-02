@@ -1,8 +1,21 @@
 {
   "app": "BSITHUB",
-  "version": "2.0.0",
+  "version": "2.5.0",
   "buildDate": "2026-04-02",
   "changelog": [
+    {
+      "version": "2.5.0",
+      "date": "2026-04-02",
+      "features": [
+        "Real-time messaging (cross-tab sync)",
+        "Message reactions (emoji reactions)",
+        "Typing indicator (shows when someone is typing)",
+        "Online status (green dot for online users)",
+        "PWA support (install as app)",
+        "Improved message bubbles",
+        "Read receipts (✓✓)"
+      ]
+    },
     {
       "version": "2.0.0",
       "date": "2026-04-02",
