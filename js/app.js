@@ -313,18 +313,31 @@ function loadChats() {
     
     var html = '';
     myChats.forEach(function(chat) {
-        var otherUserId = chat.participants.find(function(p) { return p !== currentUser.id; });
-        var otherUser = users.find(function(u) { return u.id === otherUserId; });
-        if (!otherUser) return;
-        
         var chatMessages = messages.filter(function(m) { return m.chatId === chat.id; });
         var lastMessage = chatMessages[chatMessages.length - 1];
         var unreadCount = chatMessages.filter(function(m) { return !m.read && m.senderId !== currentUser.id; }).length;
         var isActive = activeChat && activeChat.id === chat.id;
         
-        html += '<div class="chat-item ' + (isActive ? 'active' : '') + (chat.pinned ? ' pinned' : '') + '" data-chat-id="' + chat.id + '" data-user-id="' + otherUser.id + '">';
-        html += '<div class="chat-item-avatar-wrapper"><div class="chat-item-avatar">' + (otherUser.avatar ? '<img src="' + otherUser.avatar + '">' : otherUser.name.charAt(0).toUpperCase()) + '</div></div>';
-        html += '<div class="chat-item-info"><div class="chat-item-name">' + otherUser.name + '</div>';
+        var chatName = '';
+        var chatAvatar = '';
+        var chatUserId = '';
+        
+        if (chat.isGroup) {
+            chatName = chat.groupName || 'Group';
+            chatAvatar = '<i class="fas fa-users"></i>';
+            chatUserId = chat.participants[0];
+        } else {
+            var otherUserId = chat.participants.find(function(p) { return p !== currentUser.id; });
+            var otherUser = users.find(function(u) { return u.id === otherUserId; });
+            if (!otherUser) return;
+            chatName = otherUser.name;
+            chatAvatar = otherUser.avatar ? '<img src="' + otherUser.avatar + '">' : otherUser.name.charAt(0).toUpperCase();
+            chatUserId = otherUserId;
+        }
+        
+        html += '<div class="chat-item ' + (isActive ? 'active' : '') + (chat.pinned ? ' pinned' : '') + '" data-chat-id="' + chat.id + '" data-user-id="' + chatUserId + '">';
+        html += '<div class="chat-item-avatar-wrapper"><div class="chat-item-avatar">' + chatAvatar + '</div></div>';
+        html += '<div class="chat-item-info"><div class="chat-item-name">' + chatName + '</div>';
         html += '<div class="chat-item-message">' + (lastMessage ? escapeHtml(lastMessage.text).substring(0, 30) : 'No messages yet') + '</div></div>';
         html += '<div class="chat-item-meta"><div class="chat-item-time">' + (lastMessage ? formatTime(lastMessage.timestamp) : '') + '</div>';
         if (unreadCount > 0) html += '<span class="chat-item-badge">' + unreadCount + '</span>';
@@ -341,16 +354,25 @@ function loadChats() {
 }
 
 function openChat(chatId, userId) {
-    var users = Storage.get('users') || [];
-    var otherUser = users.find(function(u) { return u.id === userId; });
-    if (!otherUser) return;
+    var chats = Storage.get('chats') || [];
+    var chat = chats.find(function(c) { return c.id === chatId; });
+    if (!chat) return;
     
     activeChat = { id: chatId, userId: userId };
     
     document.getElementById('chat-placeholder').style.display = 'none';
     document.getElementById('chat-active').style.display = 'flex';
-    document.getElementById('chat-user-name').textContent = otherUser.name;
-    document.getElementById('chat-user-status').textContent = 'Online';
+    
+    if (chat.isGroup) {
+        document.getElementById('chat-user-name').textContent = chat.groupName || 'Group';
+        document.getElementById('chat-user-status').textContent = chat.participants.length + ' members';
+    } else {
+        var users = Storage.get('users') || [];
+        var otherUser = users.find(function(u) { return u.id === userId; });
+        if (!otherUser) return;
+        document.getElementById('chat-user-name').textContent = otherUser.name;
+        document.getElementById('chat-user-status').textContent = 'Online';
+    }
     
     renderMessages(chatId);
     
