@@ -435,8 +435,12 @@ function renderMessages(chatId) {
         var isSent = msg.senderId === currentUser.id;
         html += '<div class="message ' + (isSent ? 'sent' : 'received') + '">';
         
+        // Check for GIF
+        if (msg.gifUrl) {
+            html += '<div class="message-gif"><img src="' + msg.gifUrl + '" alt="GIF" class="gif-image"></div>';
+        }
         // Check for image
-        if (msg.fileData && msg.fileType && msg.fileType.startsWith('image/')) {
+        else if (msg.fileData && msg.fileType && msg.fileType.startsWith('image/')) {
             html += '<div class="message-media"><img src="' + msg.fileData + '" alt="Image" onclick="viewImage(this.src)"></div>';
         }
         // Check for audio
@@ -1042,27 +1046,48 @@ function showGifPicker() {
 
 function populateGifPicker() {
     var grid = document.getElementById('gif-grid');
-    var stickers = ['😀', '😂', '🤣', '😍', '🥰', '😎', '🤔', '👍', '👏', '🎉', '❤️', '🔥', '💯', '✨', '🙌', '💪', '🤩', '😋', '🤪', '😴', '🤗', '🤭', '😏', '😒', '🙄', '😬', '🤥', '😌', '😔', '😪', '🤤', '👋'];
+    var gifs = [
+        'https://media.giphy.com/media/3o7TKMt1VVNkHV2PaE/giphy.gif',
+        'https://media.giphy.com/media/l0MYt5jPR6QX5pnqM/giphy.gif',
+        'https://media.giphy.com/media/3oEdva9BUHPIs2SkGk/giphy.gif',
+        'https://media.giphy.com/media/l0HlvtIPzPdt2usKs/giphy.gif',
+        'https://media.giphy.com/media/3o7TKDEhacrNCODS0M/giphy.gif',
+        'https://media.giphy.com/media/26BRv0ThflsHCqDrG/giphy.gif',
+        'https://media.giphy.com/media/xT9IgG50Fb7Mi0prBC/giphy.gif',
+        'https://media.giphy.com/media/3o6ZtaO9BZHcOjmErm/giphy.gif',
+        'https://media.giphy.com/media/l0MYC0LajbaPoEADu/giphy.gif',
+        'https://media.giphy.com/media/3o7TKUZfJKUKuSWTZe/giphy.gif',
+        'https://media.giphy.com/media/xT9IgzoKnwFNmISR8I/giphy.gif',
+        'https://media.giphy.com/media/l3vR6aasfs0Ae3qdG/giphy.gif',
+        'https://media.giphy.com/media/3oEdv07JGXQLnu1mko/giphy.gif',
+        'https://media.giphy.com/media/l0MYATH9ZumUHCBq0/giphy.gif',
+        'https://media.giphy.com/media/3o7TKDEhacrNCODS0M/giphy.gif',
+        'https://media.giphy.com/media/26BRv0ThflsHCqDrG/giphy.gif'
+    ];
     
     grid.innerHTML = '';
-    stickers.forEach(function(sticker) {
+    gifs.forEach(function(gifUrl) {
         var item = document.createElement('div');
         item.className = 'gif-item';
-        item.textContent = sticker;
+        var img = document.createElement('img');
+        img.src = gifUrl;
+        img.alt = 'GIF';
+        item.appendChild(img);
         item.onclick = function() {
-            sendSticker(sticker);
+            sendGif(gifUrl);
         };
         grid.appendChild(item);
     });
 }
 
-function sendSticker(sticker) {
+function sendGif(gifUrl) {
     var messages = Storage.get('messages') || [];
     var newMessage = {
         id: generateId(),
         chatId: activeChat.id,
         senderId: currentUser.id,
-        text: sticker,
+        text: 'GIF',
+        gifUrl: gifUrl,
         timestamp: new Date().toISOString(),
         read: false,
         status: 'sent',
@@ -1076,7 +1101,7 @@ function sendSticker(sticker) {
     Storage.set('messages', messages);
     document.getElementById('gif-picker').style.display = 'none';
     loadChatMessages(activeChat.id);
-    showToast('Sent!', 'success');
+    showToast('GIF sent!', 'success');
 }
 
 function toggleVoiceMessage() {
