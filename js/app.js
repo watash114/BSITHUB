@@ -567,6 +567,431 @@ function loadAdminData() {
 }
 
 // ==========================================
+// Version History
+// ==========================================
+function showVersionHistory() {
+    var versions = Storage.get('versionInfo') || [
+        { version: '2.0.0', date: '2026-04-02', changes: 'Reply to messages, Star/bookmark, Message forwarding, Mute/Archive chats, Disappearing messages, Link previews, Chat wallpapers, Group chats, Voice messages, Message threads, @mentions, GIF support, Polls' },
+        { version: '1.5.0', date: '2026-04-02', changes: 'Typing indicator, Message reactions, Edit/delete messages, Date separators, Emoji picker, Message status, Pinned chats, Message search, Browser notifications, Blocked users' },
+        { version: '1.0.0', date: '2026-04-02', changes: 'Login/Register, Chat functionality, User profiles, Admin dashboard, Settings, Dark/Light mode, Online status' }
+    ];
+    
+    var html = '<div class="version-history"><h3>Version History</h3>';
+    versions.forEach(function(v) {
+        html += '<div class="version-item"><strong>v' + v.version + '</strong> - ' + v.date + '<p>' + v.changes + '</p></div>';
+    });
+    html += '</div>';
+    showModal(html);
+}
+
+// ==========================================
+// Archived Chats
+// ==========================================
+function toggleArchivedChats() {
+    var chats = Storage.get('chats') || [];
+    var myArchivedChats = chats.filter(function(c) { return c.participants.indexOf(currentUser.id) !== -1 && c.archived; });
+    
+    if (myArchivedChats.length === 0) {
+        showToast('No archived chats', 'info');
+        return;
+    }
+    
+    var html = '<div class="archived-chats"><h3>Archived Chats</h3>';
+    myArchivedChats.forEach(function(chat) {
+        var otherUserId = chat.participants.find(function(p) { return p !== currentUser.id; });
+        var users = Storage.get('users') || [];
+        var otherUser = users.find(function(u) { return u.id === otherUserId; });
+        html += '<div class="archived-chat-item" onclick="unarchiveChat(\'' + chat.id + '\')">' + (otherUser ? otherUser.name : 'Unknown') + '</div>';
+    });
+    html += '</div>';
+    showModal(html);
+}
+
+function unarchiveChat(chatId) {
+    var chats = Storage.get('chats') || [];
+    var chat = chats.find(function(c) { return c.id === chatId; });
+    if (chat) {
+        chat.archived = false;
+        Storage.set('chats', chats);
+        closeModal();
+        loadChats();
+        showToast('Chat unarchived', 'success');
+    }
+}
+
+// ==========================================
+// Search Messages
+// ==========================================
+function toggleMessageSearch() {
+    var searchBar = document.getElementById('chat-search-bar');
+    if (searchBar.style.display === 'none') {
+        searchBar.style.display = 'flex';
+        document.getElementById('message-search-input').focus();
+    } else {
+        searchBar.style.display = 'none';
+    }
+}
+
+function closeMessageSearch() {
+    document.getElementById('chat-search-bar').style.display = 'none';
+    document.getElementById('message-search-input').value = '';
+}
+
+function searchMessages() {
+    var query = document.getElementById('message-search-input').value.toLowerCase();
+    if (!query || !activeChat) return;
+    
+    var messages = Storage.get('messages') || [];
+    var chatMessages = messages.filter(function(m) { return m.chatId === activeChat.id; });
+    var filtered = chatMessages.filter(function(m) { return m.text.toLowerCase().includes(query); });
+    
+    var container = document.getElementById('chat-messages');
+    container.innerHTML = '';
+    
+    if (filtered.length === 0) {
+        container.innerHTML = '<div class="no-messages">No messages found</div>';
+        return;
+    }
+    
+    filtered.forEach(function(msg) {
+        var users = Storage.get('users') || [];
+        var sender = users.find(function(u) { return u.id === msg.senderId; });
+        var isMe = msg.senderId === currentUser.id;
+        
+        var div = document.createElement('div');
+        div.className = 'message ' + (isMe ? 'sent' : 'received');
+        div.innerHTML = '<div class="message-content"><div class="message-text">' + escapeHtml(msg.text) + '</div><div class="message-time">' + formatTime(msg.timestamp) + '</div></div>';
+        container.appendChild(div);
+    });
+}
+
+// ==========================================
+// Starred Messages
+// ==========================================
+function showStarredMessages() {
+    var messages = Storage.get('messages') || [];
+    var starred = messages.filter(function(m) { return m.starred; });
+    
+    if (starred.length === 0) {
+        showToast('No starred messages', 'info');
+        return;
+    }
+    
+    var html = '<div class="starred-messages"><h3>Starred Messages</h3>';
+    starred.forEach(function(msg) {
+        html += '<div class="starred-item"><p>' + escapeHtml(msg.text) + '</p><small>' + formatTime(msg.timestamp) + '</small></div>';
+    });
+    html += '</div>';
+    showModal(html);
+}
+
+// ==========================================
+// Chat Options
+// ==========================================
+function showChatOptions() {
+    if (!activeChat) {
+        showToast('Select a chat first', 'info');
+        return;
+    }
+    
+    var chat = Storage.get('chats') || [];
+    chat = chat.find(function(c) { return c.id === activeChat.id; });
+    
+    var html = '<div class="chat-options"><h3>Chat Options</h3>';
+    html += '<button class="btn" onclick="toggleMuteChat()">' + (chat && chat.muted ? 'Unmute' : 'Mute') + ' Notifications</button>';
+    html += '<button class="btn" onclick="togglePinChat()">' + (chat && chat.pinned ? 'Unpin' : 'Pin') + ' Chat</button>';
+    html += '<button class="btn" onclick="archiveChat()">Archive Chat</button>';
+    html += '<button class="btn" onclick="clearChatHistory()">Clear Chat History</button>';
+    html += '<button class="btn danger" onclick="deleteChat()">Delete Chat</button>';
+    html += '</div>';
+    showModal(html);
+}
+
+function toggleMuteChat() {
+    if (!activeChat) return;
+    var chats = Storage.get('chats') || [];
+    var chat = chats.find(function(c) { return c.id === activeChat.id; });
+    if (chat) {
+        chat.muted = !chat.muted;
+        Storage.set('chats', chats);
+        closeModal();
+        showToast(chat.muted ? 'Chat muted' : 'Chat unmuted', 'success');
+    }
+}
+
+function togglePinChat() {
+    if (!activeChat) return;
+    var chats = Storage.get('chats') || [];
+    var chat = chats.find(function(c) { return c.id === activeChat.id; });
+    if (chat) {
+        chat.pinned = !chat.pinned;
+        Storage.set('chats', chats);
+        closeModal();
+        loadChats();
+        showToast(chat.pinned ? 'Chat pinned' : 'Chat unpinned', 'success');
+    }
+}
+
+function archiveChat() {
+    if (!activeChat) return;
+    var chats = Storage.get('chats') || [];
+    var chat = chats.find(function(c) { return c.id === activeChat.id; });
+    if (chat) {
+        chat.archived = true;
+        Storage.set('chats', chats);
+        closeModal();
+        activeChat = null;
+        document.getElementById('chat-section').classList.remove('active');
+        document.getElementById('empty-chat').classList.add('active');
+        loadChats();
+        showToast('Chat archived', 'success');
+    }
+}
+
+function clearChatHistory() {
+    if (!activeChat) return;
+    var messages = Storage.get('messages') || [];
+    messages = messages.filter(function(m) { return m.chatId !== activeChat.id; });
+    Storage.set('messages', messages);
+    closeModal();
+    loadChatMessages(activeChat.id);
+    showToast('Chat history cleared', 'success');
+}
+
+function deleteChat() {
+    if (!activeChat) return;
+    var chats = Storage.get('chats') || [];
+    chats = chats.filter(function(c) { return c.id !== activeChat.id; });
+    Storage.set('chats', chats);
+    
+    var messages = Storage.get('messages') || [];
+    messages = messages.filter(function(m) { return m.chatId !== activeChat.id; });
+    Storage.set('messages', messages);
+    
+    closeModal();
+    activeChat = null;
+    document.getElementById('chat-section').classList.remove('active');
+    document.getElementById('empty-chat').classList.add('active');
+    loadChats();
+    showToast('Chat deleted', 'success');
+}
+
+// ==========================================
+// File & Media Functions
+// ==========================================
+function attachFile() {
+    showToast('File attachment coming soon', 'info');
+}
+
+function showGifPicker() {
+    showToast('GIF picker coming soon', 'info');
+}
+
+function toggleVoiceMessage() {
+    showToast('Voice messages coming soon', 'info');
+}
+
+function toggleEmojiPicker() {
+    showToast('Emoji picker coming soon', 'info');
+}
+
+// ==========================================
+// Group Functions
+// ==========================================
+function showCreateGroup() {
+    var users = Storage.get('users') || [];
+    var otherUsers = users.filter(function(u) { return u.id !== currentUser.id; });
+    
+    var html = '<div class="create-group"><h3>Create Group</h3>';
+    html += '<input type="text" id="group-name-input" placeholder="Group name">';
+    html += '<div class="user-list">';
+    otherUsers.forEach(function(user) {
+        html += '<label><input type="checkbox" value="' + user.id + '"> ' + user.name + '</label>';
+    });
+    html += '</div>';
+    html += '<button class="btn btn-primary" onclick="createGroup()">Create</button>';
+    html += '</div>';
+    showModal(html);
+}
+
+function createGroup() {
+    var name = document.getElementById('group-name-input').value;
+    if (!name) {
+        showToast('Enter a group name', 'error');
+        return;
+    }
+    
+    var checkboxes = document.querySelectorAll('#modal input[type="checkbox"]:checked');
+    var participants = [currentUser.id];
+    checkboxes.forEach(function(cb) { participants.push(cb.value); });
+    
+    if (participants.length < 2) {
+        showToast('Select at least one participant', 'error');
+        return;
+    }
+    
+    var chats = Storage.get('chats') || [];
+    var newChat = {
+        id: generateId(),
+        participants: participants,
+        createdAt: new Date().toISOString(),
+        pinned: false,
+        muted: false,
+        archived: false,
+        isGroup: true,
+        groupName: name
+    };
+    chats.push(newChat);
+    Storage.set('chats', chats);
+    
+    closeModal();
+    loadChats();
+    showToast('Group created!', 'success');
+}
+
+// ==========================================
+// Profile Functions
+// ==========================================
+function changeAvatar() {
+    showToast('Avatar change coming soon', 'info');
+}
+
+// ==========================================
+// Settings Functions
+// ==========================================
+function showWallpaperPicker() {
+    var wallpapers = ['none', '#f5f5f5', '#e8f5e9', '#fff3e0', '#e3f2fd', '#fce4ec'];
+    var html = '<div class="wallpaper-picker"><h3>Chat Wallpaper</h3><div class="wallpaper-options">';
+    wallpapers.forEach(function(w) {
+        html += '<div class="wallpaper-option" style="background:' + w + '" onclick="setWallpaper(\'' + w + '\')"></div>';
+    });
+    html += '</div></div>';
+    showModal(html);
+}
+
+function setWallpaper(color) {
+    document.getElementById('chat-wallpaper').style.background = color;
+    var settings = Storage.get('settings') || {};
+    settings.wallpaper = color;
+    Storage.set('settings', settings);
+    closeModal();
+    showToast('Wallpaper changed', 'success');
+}
+
+function showChangePassword() {
+    var html = '<div class="change-password"><h3>Change Password</h3>';
+    html += '<input type="password" id="current-password" placeholder="Current password">';
+    html += '<input type="password" id="new-password" placeholder="New password">';
+    html += '<input type="password" id="confirm-new-password" placeholder="Confirm new password">';
+    html += '<button class="btn btn-primary" onclick="changePassword()">Change Password</button>';
+    html += '</div>';
+    showModal(html);
+}
+
+function changePassword() {
+    var current = document.getElementById('current-password').value;
+    var newPass = document.getElementById('new-password').value;
+    var confirm = document.getElementById('confirm-new-password').value;
+    
+    if (hashPassword(current) !== currentUser.password) {
+        showToast('Current password incorrect', 'error');
+        return;
+    }
+    if (newPass !== confirm) {
+        showToast('New passwords do not match', 'error');
+        return;
+    }
+    if (newPass.length < 6) {
+        showToast('Password must be 6+ characters', 'error');
+        return;
+    }
+    
+    var users = Storage.get('users') || [];
+    var user = users.find(function(u) { return u.id === currentUser.id; });
+    if (user) {
+        user.password = hashPassword(newPass);
+        currentUser.password = user.password;
+        Storage.set('users', users);
+        closeModal();
+        showToast('Password changed!', 'success');
+    }
+}
+
+function showBlockedUsers() {
+    var users = Storage.get('users') || [];
+    var blocked = currentUser.blockedUsers || [];
+    var blockedUsers = users.filter(function(u) { return blocked.indexOf(u.id) !== -1; });
+    
+    var html = '<div class="blocked-users"><h3>Blocked Users</h3>';
+    if (blockedUsers.length === 0) {
+        html += '<p>No blocked users</p>';
+    } else {
+        blockedUsers.forEach(function(user) {
+            html += '<div class="blocked-user"><span>' + user.name + '</span><button class="btn btn-small" onclick="unblockUser(\'' + user.id + '\')">Unblock</button></div>';
+        });
+    }
+    html += '</div>';
+    showModal(html);
+}
+
+function unblockUser(userId) {
+    var users = Storage.get('users') || [];
+    var user = users.find(function(u) { return u.id === currentUser.id; });
+    if (user && user.blockedUsers) {
+        user.blockedUsers = user.blockedUsers.filter(function(id) { return id !== userId; });
+        currentUser.blockedUsers = user.blockedUsers;
+        Storage.set('users', users);
+        showBlockedUsers();
+        showToast('User unblocked', 'success');
+    }
+}
+
+function exportData() {
+    var data = {
+        user: currentUser,
+        chats: Storage.get('chats') || [],
+        messages: Storage.get('messages') || []
+    };
+    
+    var blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = 'bsithub-data-' + new Date().toISOString().split('T')[0] + '.json';
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('Data exported!', 'success');
+}
+
+function clearCache() {
+    localStorage.clear();
+    showToast('Cache cleared', 'success');
+    setTimeout(function() { location.reload(); }, 1000);
+}
+
+function confirmDeleteAccount() {
+    showModal('<div class="delete-account"><h3>Delete Account</h3><p>Are you sure? This cannot be undone.</p><button class="btn danger" onclick="deleteAccount()">Delete My Account</button></div>');
+}
+
+function deleteAccount() {
+    var users = Storage.get('users') || [];
+    users = users.filter(function(u) { return u.id !== currentUser.id; });
+    Storage.set('users', users);
+    
+    var chats = Storage.get('chats') || [];
+    chats = chats.filter(function(c) { return c.participants.indexOf(currentUser.id) === -1; });
+    Storage.set('chats', chats);
+    
+    var messages = Storage.get('messages') || [];
+    messages = messages.filter(function(m) { return m.senderId !== currentUser.id; });
+    Storage.set('messages', messages);
+    
+    localStorage.removeItem('currentUser');
+    showToast('Account deleted', 'success');
+    setTimeout(function() { location.reload(); }, 1000);
+}
+
+// ==========================================
 // Event Listeners
 // ==========================================
 document.addEventListener('DOMContentLoaded', function() {
@@ -657,6 +1082,59 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Logout
     document.getElementById('logout-btn').onclick = logout;
+    
+    // Version History
+    document.getElementById('version-history-btn').onclick = showVersionHistory;
+    
+    // Archived Chats
+    document.getElementById('archived-chats-btn').onclick = toggleArchivedChats;
+    
+    // Search Messages
+    document.getElementById('search-messages-btn').onclick = toggleMessageSearch;
+    document.getElementById('close-message-search').onclick = closeMessageSearch;
+    document.getElementById('message-search-input').oninput = searchMessages;
+    
+    // Starred Messages
+    document.getElementById('starred-messages-btn').onclick = showStarredMessages;
+    
+    // Chat Options
+    document.getElementById('chat-options-btn').onclick = showChatOptions;
+    
+    // Attach File
+    document.getElementById('attach-file-btn').onclick = attachFile;
+    
+    // GIF
+    document.getElementById('gif-btn').onclick = showGifPicker;
+    
+    // Voice Message
+    document.getElementById('voice-btn').onclick = toggleVoiceMessage;
+    
+    // Emoji
+    document.getElementById('emoji-btn').onclick = toggleEmojiPicker;
+    
+    // Create Group
+    document.getElementById('create-group-btn').onclick = showCreateGroup;
+    
+    // Change Avatar
+    document.getElementById('change-avatar-btn').onclick = changeAvatar;
+    
+    // Chat Wallpaper
+    document.getElementById('chat-wallpaper-btn').onclick = showWallpaperPicker;
+    
+    // Change Password
+    document.getElementById('change-password-btn').onclick = showChangePassword;
+    
+    // Blocked Users
+    document.getElementById('blocked-users-btn').onclick = showBlockedUsers;
+    
+    // Export Data
+    document.getElementById('export-data-btn').onclick = exportData;
+    
+    // Clear Cache
+    document.getElementById('clear-cache-btn').onclick = clearCache;
+    
+    // Delete Account
+    document.getElementById('delete-account-btn').onclick = confirmDeleteAccount;
     
     // Modal close
     document.getElementById('modal').onclick = function(e) {
