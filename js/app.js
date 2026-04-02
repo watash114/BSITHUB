@@ -1029,30 +1029,40 @@ function showGifPicker() {
         return;
     }
     
-    var gifs = ['😀', '😂', '🤣', '😍', '🥰', '😎', '🤔', '👍', '👏', '🎉', '❤️', '🔥', '💯', '✨', '🙌', '💪', '😎', '🤩', '😋', '🤪', '😴', '🤗', '🤭', '😏', '😒', '🙄', '😬', '🤥', '😌', '😔', '😪', '🤤'];
-    var html = '<div class="gif-picker"><h3>Send Sticker</h3><div class="gif-grid">';
-    gifs.forEach(function(gif, index) {
-        html += '<div class="gif-item" data-index="' + index + '">' + gif + '</div>';
-    });
-    html += '</div></div>';
-    showModal(html);
+    var picker = document.getElementById('gif-picker');
+    var isVisible = picker.style.display !== 'none';
+    picker.style.display = isVisible ? 'none' : 'flex';
     
-    setTimeout(function() {
-        document.querySelectorAll('.gif-item').forEach(function(item, index) {
-            item.onclick = function() {
-                sendGif(gifs[index]);
-            };
-        });
-    }, 50);
+    if (!isVisible) {
+        populateGifPicker();
+    }
+    
+    document.getElementById('emoji-picker').style.display = 'none';
 }
 
-function sendGif(emoji) {
+function populateGifPicker() {
+    var grid = document.getElementById('gif-grid');
+    var stickers = ['😀', '😂', '🤣', '😍', '🥰', '😎', '🤔', '👍', '👏', '🎉', '❤️', '🔥', '💯', '✨', '🙌', '💪', '🤩', '😋', '🤪', '😴', '🤗', '🤭', '😏', '😒', '🙄', '😬', '🤥', '😌', '😔', '😪', '🤤', '👋'];
+    
+    grid.innerHTML = '';
+    stickers.forEach(function(sticker) {
+        var item = document.createElement('div');
+        item.className = 'gif-item';
+        item.textContent = sticker;
+        item.onclick = function() {
+            sendSticker(sticker);
+        };
+        grid.appendChild(item);
+    });
+}
+
+function sendSticker(sticker) {
     var messages = Storage.get('messages') || [];
     var newMessage = {
         id: generateId(),
         chatId: activeChat.id,
         senderId: currentUser.id,
-        text: emoji,
+        text: sticker,
         timestamp: new Date().toISOString(),
         read: false,
         status: 'sent',
@@ -1064,7 +1074,7 @@ function sendGif(emoji) {
     };
     messages.push(newMessage);
     Storage.set('messages', messages);
-    closeModal();
+    document.getElementById('gif-picker').style.display = 'none';
     loadChatMessages(activeChat.id);
     showToast('Sent!', 'success');
 }
@@ -1140,28 +1150,57 @@ function toggleEmojiPicker() {
         return;
     }
     
-    var emojis = ['😀', '😃', '😄', '😁', '😆', '😅', '🤣', '😂', '🙂', '😊', '😇', '🥰', '😍', '🤩', '😘', '😗', '😚', '😙', '🥲', '😋', '😛', '😜', '🤪', '😝', '🤑', '🤗', '🤭', '🤫', '🤔', '🤐', '🤨', '😐', '😑', '😶', '😏', '😒', '🙄', '😬', '🤥', '😌', '😔', '😪', '🤤', '😴', '😷', '🤒', '🤕', '🤢', '🤮', '🤧', '🥵', '🥶', '🥴', '😵', '🤯', '🤠', '🥳', '🥸', '😎', '🤓', '🧐', '👋', '🤚', '🖐', '✋', '🖖', '👌', '🤌', '🤏', '✌️', '🤞', '🤟', '🤘', '🤙', '👈', '👉', '👆', '🖕', '👇', '☝️', '👍', '👎', '✊', '👊', '🤛', '🤜', '👏', '🙌', '👐', '🤲', '🤝', '🙏', '✍️', '💅', '🤳', '💪', '🦾', '🦿', '🦵', '🦶', '👂', '🦻', '👃', '🧠', '🫀', '🫁', '🦷', '🦴', '👀', '👁', '👅', '👄', '💋', '🩸'];
-    var html = '<div class="emoji-picker"><h3>Emoji</h3><div class="emoji-grid">';
-    emojis.forEach(function(emoji, index) {
-        html += '<div class="emoji-item" data-index="' + index + '">' + emoji + '</div>';
-    });
-    html += '</div></div>';
-    showModal(html);
+    var picker = document.getElementById('emoji-picker');
+    var isVisible = picker.style.display !== 'none';
+    picker.style.display = isVisible ? 'none' : 'flex';
     
-    setTimeout(function() {
-        document.querySelectorAll('.emoji-item').forEach(function(item, index) {
-            item.onclick = function() {
-                insertEmoji(emojis[index]);
-            };
-        });
-    }, 50);
+    if (!isVisible) {
+        populateEmojiPicker('smileys');
+        initEmojiCategories();
+    }
+    
+    document.getElementById('gif-picker').style.display = 'none';
+}
+
+function populateEmojiPicker(category) {
+    var list = document.getElementById('emoji-list');
+    var emojis = {
+        smileys: ['😀', '😃', '😄', '😁', '😆', '😅', '🤣', '😂', '🙂', '😊', '😇', '🥰', '😍', '🤩', '😘', '😗', '😚', '😙', '🥲', '😋', '😛', '😜', '🤪', '😝', '🤑', '🤗', '🤭', '🤫', '🤔', '🤐', '🤨', '😐', '😑', '😶', '😏', '😒', '🙄', '😬', '🤥', '😌', '😔', '😪', '🤤', '😴', '😷', '🤒', '🤕', '🤢', '🤮', '🤧', '🥵', '🥶', '🥴', '😵', '🤯', '🤠', '🥳', '🥸', '😎', '🤓', '🧐'],
+        hearts: ['❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍', '🤎', '💔', '❣️', '💕', '💞', '💓', '💗', '💖', '💘', '💝', '💟', '♥️'],
+        thumbs: ['👍', '👎', '👊', '✊', '🤛', '🤜', '👏', '🙌', '👐', '🤲', '🤝', '🙏', '✍️', '💪', '🦾', '🦿', '🦵', '🦶', '👂', '🦻', '👃', '🧠', '🫀', '🫁', '🦷', '🦴', '👀', '👁', '👅', '👄'],
+        animals: ['🐱', '🐶', '🐭', '🐹', '🐰', '🦊', '🐻', '🐼', '🐨', '🐯', '🦁', '🐮', '🐷', '🐸', '🐵', '🙈', '🙉', '🙊', '🐔', '🐧', '🐦', '🐤', '🦆', '🦅', '🦉', '🦇', '🐺', '🐗', '🐴', '🦄'],
+        food: ['🍕', '🍔', '🍟', '🌭', '🍿', '🧂', '🥓', '🥚', '🍳', '🧇', '🥞', '🧈', '🍞', '🥐', '🥖', '🥨', '🧀', '🥗', '🥙', '🥪', '🌮', '🌯', '🥫', '🍝', '🍜', '🍲', '🍛', '🍣', '🍱', '🥟']
+    };
+    
+    var emojiList = emojis[category] || emojis.smileys;
+    list.innerHTML = '';
+    
+    emojiList.forEach(function(emoji) {
+        var item = document.createElement('div');
+        item.className = 'emoji-item';
+        item.textContent = emoji;
+        item.onclick = function() {
+            insertEmoji(emoji);
+        };
+        list.appendChild(item);
+    });
+}
+
+function initEmojiCategories() {
+    document.querySelectorAll('.emoji-category').forEach(function(btn) {
+        btn.onclick = function() {
+            document.querySelectorAll('.emoji-category').forEach(function(b) { b.classList.remove('active'); });
+            this.classList.add('active');
+            populateEmojiPicker(this.dataset.category);
+        };
+    });
 }
 
 function insertEmoji(emoji) {
     var input = document.getElementById('message-input');
     input.value += emoji;
     input.focus();
-    closeModal();
+    document.getElementById('emoji-picker').style.display = 'none';
 }
 
 // ==========================================
