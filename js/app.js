@@ -358,6 +358,7 @@ function showAuthPage() {
 }
 
 function showApp() {
+    console.log('showApp called, currentUser:', currentUser);
     document.getElementById('auth-page').classList.remove('active');
     document.getElementById('app-page').classList.add('active');
     initializeApp();
@@ -1660,7 +1661,9 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Toggle password visibility
     document.querySelectorAll('.toggle-password').forEach(function(toggle) {
-        toggle.onclick = function() {
+        toggle.onclick = function(e) {
+            e.preventDefault();
+            e.stopPropagation();
             var input = this.previousElementSibling;
             if (input.type === 'password') {
                 input.type = 'text';
@@ -1671,15 +1674,20 @@ document.addEventListener('DOMContentLoaded', function() {
                 this.classList.remove('fa-eye-slash');
                 this.classList.add('fa-eye');
             }
+            return false;
         };
     });
     
     // Login form
     document.getElementById('login-form').onsubmit = function(e) {
         e.preventDefault();
+        e.stopPropagation();
+        console.log('Login form submitted');
         var email = document.getElementById('login-email').value;
         var password = document.getElementById('login-password').value;
+        console.log('Email:', email);
         var result = login(email, password);
+        console.log('Login result:', result);
         
         if (result.success) {
             showToast('Welcome back!', 'success');
@@ -1688,6 +1696,7 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('login-error').textContent = result.message;
             document.getElementById('login-error').style.display = 'block';
         }
+        return false;
     };
     
     // Register form
