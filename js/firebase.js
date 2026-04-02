@@ -22,12 +22,17 @@ function initFirebaseMessaging() {
     if (firebaseInitialized) return;
     
     if (typeof firebase === 'undefined') {
-        console.warn('Firebase SDK not loaded');
+        console.warn('Firebase SDK not loaded, will retry...');
+        setTimeout(initFirebaseMessaging, 1000);
         return;
     }
     
     try {
-        firebaseApp = firebase.initializeApp(firebaseConfig);
+        if (!firebase.apps.length) {
+            firebaseApp = firebase.initializeApp(firebaseConfig);
+        } else {
+            firebaseApp = firebase.app();
+        }
         firebaseDb = firebase.database();
         firebaseInitialized = true;
         console.log('Firebase initialized for messaging');
