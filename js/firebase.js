@@ -3,7 +3,7 @@
 // ==========================================
 
 // Firebase Configuration (Real BSITHUB Project)
-const firebaseConfig = {
+var firebaseConfig = {
     apiKey: "AIzaSyDqCLKvwD3j9z_EQCzHrtcGXOpYgXPm3yw",
     authDomain: "bsithub-1974a.firebaseapp.com",
     databaseURL: "https://bsithub-1974a-default-rtdb.firebaseio.com",
@@ -15,9 +15,9 @@ const firebaseConfig = {
 };
 
 // Initialize Firebase
-let firebaseApp = null;
-let firebaseDb = null;
-let firebaseInitialized = false;
+var firebaseApp = null;
+var firebaseDb = null;
+var firebaseInitialized = false;
 
 function initFirebase() {
     if (firebaseInitialized) return;
@@ -52,7 +52,7 @@ function useLocalFallback() {
 function setUserPresenceOnline(userId, peerId) {
     if (!firebaseDb) {
         // Fallback to localStorage
-        const onlineUsers = JSON.parse(localStorage.getItem('onlineUsers') || '{}');
+        var onlineUsers = JSON.parse(localStorage.getItem('onlineUsers') || '{}');
         onlineUsers[userId] = {
             online: true,
             peerId: peerId,
@@ -62,7 +62,7 @@ function setUserPresenceOnline(userId, peerId) {
         return;
     }
     
-    const userRef = firebaseDb.ref('presence/' + userId);
+    var userRef = firebaseDb.ref('presence/' + userId);
     
     // Set user as online
     userRef.set({
@@ -80,7 +80,7 @@ function setUserPresenceOnline(userId, peerId) {
 
 function setUserPresenceOffline(userId) {
     if (!firebaseDb) {
-        const onlineUsers = JSON.parse(localStorage.getItem('onlineUsers') || '{}');
+        var onlineUsers = JSON.parse(localStorage.getItem('onlineUsers') || '{}');
         if (onlineUsers[userId]) {
             onlineUsers[userId].online = false;
             onlineUsers[userId].lastSeen = Date.now();
@@ -89,7 +89,7 @@ function setUserPresenceOffline(userId) {
         return;
     }
     
-    const userRef = firebaseDb.ref('presence/' + userId);
+    var userRef = firebaseDb.ref('presence/' + userId);
     userRef.update({
         online: false,
         lastSeen: firebase.database.ServerValue.TIMESTAMP
@@ -98,25 +98,25 @@ function setUserPresenceOffline(userId) {
 
 function getUserPresence(userId, callback) {
     if (!firebaseDb) {
-        const onlineUsers = JSON.parse(localStorage.getItem('onlineUsers') || '{}');
+        var onlineUsers = JSON.parse(localStorage.getItem('onlineUsers') || '{}');
         callback(onlineUsers[userId] || { online: false, peerId: null });
         return;
     }
     
-    firebaseDb.ref('presence/' + userId).on('value', (snapshot) => {
-        const data = snapshot.val();
+    firebaseDb.ref('presence/' + userId).on('value', function(snapshot) {
+        var data = snapshot.val();
         callback(data || { online: false, peerId: null });
     });
 }
 
 function getAllOnlineUsers(callback) {
     if (!firebaseDb) {
-        const onlineUsers = JSON.parse(localStorage.getItem('onlineUsers') || '{}');
+        var onlineUsers = JSON.parse(localStorage.getItem('onlineUsers') || '{}');
         callback(onlineUsers);
         return;
     }
     
-    firebaseDb.ref('presence').on('value', (snapshot) => {
+    firebaseDb.ref('presence').on('value', function(snapshot) {
         callback(snapshot.val() || {});
     });
 }
@@ -128,7 +128,7 @@ function getAllOnlineUsers(callback) {
 function sendCallSignal(callerId, targetId, signalData) {
     if (!firebaseDb) {
         // Store in localStorage for same-browser testing
-        const signals = JSON.parse(localStorage.getItem('callSignals') || '{}');
+        var signals = JSON.parse(localStorage.getItem('callSignals') || '{}');
         signals[targetId] = {
             callerId: callerId,
             data: signalData,
@@ -145,7 +145,7 @@ function sendCallSignal(callerId, targetId, signalData) {
     });
     
     // Auto-delete after 30 seconds
-    setTimeout(() => {
+    setTimeout(function() {
         firebaseDb.ref('calls/' + targetId).remove();
     }, 30000);
 }
@@ -153,10 +153,10 @@ function sendCallSignal(callerId, targetId, signalData) {
 function listenForIncomingCalls(userId, callback) {
     if (!firebaseDb) {
         // Poll localStorage for signals
-        setInterval(() => {
-            const signals = JSON.parse(localStorage.getItem('callSignals') || '{}');
+        setInterval(function() {
+            var signals = JSON.parse(localStorage.getItem('callSignals') || '{}');
             if (signals[userId]) {
-                const signal = signals[userId];
+                var signal = signals[userId];
                 // Only process if signal is recent (within 30 seconds)
                 if (Date.now() - signal.timestamp < 30000) {
                     callback(signal);
@@ -168,8 +168,8 @@ function listenForIncomingCalls(userId, callback) {
         return;
     }
     
-    firebaseDb.ref('calls/' + userId).on('value', (snapshot) => {
-        const data = snapshot.val();
+    firebaseDb.ref('calls/' + userId).on('value', function(snapshot) {
+        var data = snapshot.val();
         if (data) {
             callback(data);
             // Clear the signal after processing
@@ -180,7 +180,7 @@ function listenForIncomingCalls(userId, callback) {
 
 function acceptCallSignal(targetId, callerId) {
     if (!firebaseDb) {
-        const signals = JSON.parse(localStorage.getItem('callAccepted') || '{}');
+        var signals = JSON.parse(localStorage.getItem('callAccepted') || '{}');
         signals[callerId] = {
             targetId: targetId,
             timestamp: Date.now()
@@ -198,7 +198,7 @@ function acceptCallSignal(targetId, callerId) {
 
 function declineCallSignal(targetId, callerId) {
     if (!firebaseDb) {
-        const signals = JSON.parse(localStorage.getItem('callDeclined') || '{}');
+        var signals = JSON.parse(localStorage.getItem('callDeclined') || '{}');
         signals[callerId] = {
             targetId: targetId,
             timestamp: Date.now()
@@ -213,7 +213,7 @@ function declineCallSignal(targetId, callerId) {
         timestamp: firebase.database.ServerValue.TIMESTAMP
     });
     
-    setTimeout(() => {
+    setTimeout(function() {
         firebaseDb.ref('callResponses/' + callerId).remove();
     }, 5000);
 }
@@ -221,9 +221,9 @@ function declineCallSignal(targetId, callerId) {
 function listenForCallResponse(callerId, callback) {
     if (!firebaseDb) {
         // Poll localStorage
-        const checkResponse = () => {
-            const accepted = JSON.parse(localStorage.getItem('callAccepted') || '{}');
-            const declined = JSON.parse(localStorage.getItem('callDeclined') || '{}');
+        var checkResponse = function() {
+            var accepted = JSON.parse(localStorage.getItem('callAccepted') || '{}');
+            var declined = JSON.parse(localStorage.getItem('callDeclined') || '{}');
             
             if (accepted[callerId]) {
                 callback({ accepted: true });
@@ -236,18 +236,18 @@ function listenForCallResponse(callerId, callback) {
             }
         };
         
-        const interval = setInterval(checkResponse, 500);
-        return () => clearInterval(interval);
+        var interval = setInterval(checkResponse, 500);
+        return function() { clearInterval(interval); };
     }
     
-    firebaseDb.ref('callResponses/' + callerId).on('value', (snapshot) => {
-        const data = snapshot.val();
+    firebaseDb.ref('callResponses/' + callerId).on('value', function(snapshot) {
+        var data = snapshot.val();
         if (data) {
             callback(data);
         }
     });
     
-    return () => {
+    return function() {
         firebaseDb.ref('callResponses/' + callerId).off();
     };
 }
