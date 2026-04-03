@@ -41,8 +41,21 @@ function initFirebase() {
 function sendMsgToFirebase(msg) {
     return new Promise(function(resolve, reject) {
         function trySend() {
-            if (!firebaseDb) { setTimeout(trySend, 1000); return; }
-            firebaseDb.ref('messages/' + msg.chatId + '/' + msg.id).set(msg).then(resolve).catch(reject);
+            if (!firebaseDb) { 
+                console.log('Firebase not ready, retrying send...');
+                setTimeout(trySend, 1000); 
+                return; 
+            }
+            console.log('Sending message to Firebase:', msg.id, msg.chatId);
+            firebaseDb.ref('messages/' + msg.chatId + '/' + msg.id).set(msg)
+                .then(function() {
+                    console.log('Message sent to Firebase successfully!');
+                    resolve();
+                })
+                .catch(function(err) {
+                    console.error('Firebase send error:', err);
+                    reject(err);
+                });
         }
         trySend();
     });
@@ -74,13 +87,26 @@ function stopListenChat(chatId) {
 function loadChatMessages(chatId) {
     return new Promise(function(resolve) {
         function tryLoad() {
-            if (!firebaseDb) { setTimeout(tryLoad, 1000); return; }
+            if (!firebaseDb) { 
+                console.log('Firebase not ready for loadChatMessages, retrying...');
+                setTimeout(tryLoad, 1000); 
+                return; 
+            }
+            console.log('Loading messages from Firebase for chat:', chatId);
             firebaseDb.ref('messages/' + chatId).once('value').then(function(snap) {
                 var msgs = [];
-                if (snap.val()) { snap.forEach(function(c) { msgs.push(c.val()); }); }
+                if (snap.val()) { 
+                    snap.forEach(function(c) { msgs.push(c.val()); }); 
+                    console.log('Loaded', msgs.length, 'messages from Firebase');
+                } else {
+                    console.log('No messages found in Firebase for chat:', chatId);
+                }
                 msgs.sort(function(a, b) { return new Date(a.timestamp) - new Date(b.timestamp); });
                 resolve(msgs);
-            }).catch(function() { resolve([]); });
+            }).catch(function(err) {
+                console.error('Error loading messages:', err);
+                resolve([]);
+            });
         }
         tryLoad();
     });

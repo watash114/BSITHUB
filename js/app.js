@@ -894,12 +894,13 @@ function openChat(chatId, userId) {
         });
     }
     
-    // POLLING BACKUP - fetch messages every 2 seconds (in case listener fails)
+    // POLLING BACKUP - fetch messages every 1 second (in case listener fails)
     if (window.chatPollInterval) {
         clearInterval(window.chatPollInterval);
     }
     window.chatPollInterval = setInterval(function() {
         if (activeChat && activeChat.id === chatId && typeof loadChatMessages === 'function') {
+            console.log('Polling for messages...');
             loadChatMessages(chatId).then(function(fbMessages) {
                 if (fbMessages && fbMessages.length > 0) {
                     var localMessages = Storage.get('messages') || [];
