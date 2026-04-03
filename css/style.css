@@ -1225,11 +1225,26 @@ body {
 .message-voice {
     display: flex;
     align-items: center;
-    gap: 12px;
-    padding: 8px;
-    background: rgba(0,0,0,0.1);
-    border-radius: 8px;
-    margin-bottom: 8px;
+    gap: 10px;
+    padding: 5px 10px;
+    margin: 0;
+}
+
+.message-voice .voice-icon {
+    width: 32px;
+    height: 32px;
+    background: var(--primary);
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+}
+
+.message-voice audio {
+    width: 200px;
+    height: 36px;
 }
 
 .voice-play-btn {

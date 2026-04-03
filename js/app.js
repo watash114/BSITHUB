@@ -1075,9 +1075,13 @@ function renderMessages(chatId) {
         else if (msg.fileData && msg.fileType && msg.fileType.startsWith('video/')) {
             html += '<div class="message-video"><video controls src="' + msg.fileData + '"></video></div>';
         }
-        // Check for audio
+        // Check for audio file
         else if (msg.fileData && msg.fileType && msg.fileType.startsWith('audio/')) {
             html += '<div class="message-audio"><audio controls src="' + msg.fileData + '"></audio></div>';
+        }
+        // Check for voice message (audioData field)
+        else if (msg.audioData) {
+            html += '<div class="message-voice"><div class="voice-icon"><i class="fas fa-microphone"></i></div><audio controls src="' + msg.audioData + '"></audio></div>';
         }
         // Check for file
         else if (msg.fileData) {
@@ -1131,12 +1135,17 @@ function renderMessages(chatId) {
         }
         html += '</div>';
         
+        // Check if message can be edited (only text messages)
+        var canEdit = isSent && !msg.gifUrl && !msg.fileData && !msg.audioData;
+        
         // Action buttons
         html += '<div class="message-actions">';
         html += '<button class="message-action-btn" onclick="showReactionPicker(\'' + msg.id + '\')" title="React">😀</button>';
         html += '<button class="message-action-btn" onclick="forwardMessage(\'' + msg.id + '\')" title="Forward"><i class="fas fa-share"></i></button>';
-        if (isSent) {
+        if (canEdit) {
             html += '<button class="message-action-btn" onclick="editMessage(\'' + msg.id + '\')" title="Edit"><i class="fas fa-edit"></i></button>';
+        }
+        if (isSent) {
             html += '<button class="message-action-btn" onclick="deleteMessage(\'' + msg.id + '\')" title="Delete"><i class="fas fa-trash"></i></button>';
         }
         html += '</div>';
