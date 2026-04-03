@@ -4073,30 +4073,10 @@ function endVideoCall() {
     
     showToast('Call ended', 'info');
 }
-    
-    if (isVideoCallActive) {
-        showToast('Already in a call', 'info');
-        return;
-    }
-    
-    showModal('<div class="video-call-setup"><h3><i class="fas fa-video"></i> Start Video Call</h3><p>Video calling requires Stream API credentials.</p><div class="setup-steps"><a href="https://getstream.io/video/" target="_blank" class="setup-link"><i class="fas fa-external-link-alt"></i> Get Stream API Key</a></div><p class="setup-note">After getting your API key, update STREAM_API_KEY in app.js</p><button class="btn btn-primary" onclick="initVideoCall()"><i class="fas fa-phone"></i> Start Call</button><button class="btn" onclick="closeModal()">Cancel</button></div>');
-}
 
-async function initVideoCall() {
-    closeModal();
-    
-    if (STREAM_API_KEY === 'YOUR_STREAM_API_KEY') {
-        showToast('Please configure Stream API key first', 'error');
-        return;
-    }
-    
-    try {
-        // Check if Stream SDK is loaded
-        if (typeof StreamVideoClient === 'undefined') {
-            // Try to load dynamically
-            await new Promise(function(resolve, reject) {
-                var script = document.createElement('script');
-                script.src = 'https://cdn.jsdelivr.net/npm/@stream-io/video-client@1.6.0/dist/browser/client.min.js';
+// ==========================================
+// Quick Actions Menu
+// ==========================================
                 script.onload = resolve;
                 script.onerror = reject;
                 document.head.appendChild(script);
