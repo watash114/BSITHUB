@@ -2045,6 +2045,28 @@ function confirmDeleteAccount() {
     showModal('<div class="delete-account"><h3>Delete Account</h3><p>Are you sure? This cannot be undone.</p><button class="btn danger" onclick="deleteAccount()">Delete My Account</button></div>');
 }
 
+function showNewChat() {
+    var users = Storage.get('users') || [];
+    var otherUsers = users.filter(function(u) { return u.id !== currentUser.id; });
+    
+    if (otherUsers.length === 0) {
+        showToast('No other users registered yet', 'info');
+        return;
+    }
+    
+    var html = '<div class="new-chat-modal"><h3>Start New Chat</h3><div class="user-list">';
+    otherUsers.forEach(function(user) {
+        var avatar = user.avatar ? '<img src="' + user.avatar + '">' : user.name.charAt(0).toUpperCase();
+        html += '<div class="user-item" onclick="createNewChat(\'' + user.id + '\')">';
+        html += '<div class="user-avatar">' + avatar + '</div>';
+        html += '<div class="user-info"><div class="user-name">' + escapeHtml(user.name) + '</div>';
+        html += '<div class="user-username">@' + escapeHtml(user.username) + '</div></div>';
+        html += '</div>';
+    });
+    html += '</div></div>';
+    showModal(html);
+}
+
 function deleteAccount() {
     var users = Storage.get('users') || [];
     users = users.filter(function(u) { return u.id !== currentUser.id; });
