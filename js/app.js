@@ -3599,12 +3599,103 @@ function showForgotPassword() {
     var html = '<div class="forgot-password-modal">';
     html += '<div class="forgot-icon"><i class="fas fa-key"></i></div>';
     html += '<h3>Reset Password</h3>';
-    html += '<p>Enter your email and new password</p>';
+    html += '<p>Enter your email to receive a verification code</p>';
     html += '<div class="forgot-form">';
     html += '<div class="forgot-input">';
     html += '<i class="fas fa-envelope"></i>';
     html += '<input type="email" id="reset-email" placeholder="Your email">';
     html += '</div>';
+    html += '<button class="btn btn-primary" onclick="sendResetCode()"><i class="fas fa-paper-plane"></i> Send Code</button>';
+    html += '<button class="btn-text" onclick="closeModal()">Cancel</button>';
+    html += '</div></div>';
+    showModal(html);
+}
+
+var resetVerificationCode = null;
+var resetUserEmail = null;
+
+function sendResetCode() {
+    var email = document.getElementById('reset-email').value;
+    if (!email) {
+        showToast('Please enter your email', 'error');
+        return;
+    }
+    
+    var users = Storage.get('users') || [];
+    var user = users.find(function(u) { return u.email === email; });
+    
+    if (!user) {
+        showToast('Email not found', 'error');
+        return;
+    }
+    
+    // Generate verification code
+    resetVerificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+    resetUserEmail = email;
+    
+    // Show verification code modal
+    var html = '<div class="forgot-password-modal">';
+    html += '<div class="forgot-icon"><i class="fas fa-envelope-open-text"></i></div>';
+    html += '<h3>Enter Verification Code</h3>';
+    html += '<p>We sent a code to ' + email + '</p>';
+    html += '<div class="demo-code"><small>Your verification code (demo):</small><strong>' + resetVerificationCode + '</strong></div>';
+    html += '<div class="code-inputs">';
+    html += '<input type="text" maxlength="1" class="code-input" data-index="0">';
+    html += '<input type="text" maxlength="1" class="code-input" data-index="1">';
+    html += '<input type="text" maxlength="1" class="code-input" data-index="2">';
+    html += '<input type="text" maxlength="1" class="code-input" data-index="3">';
+    html += '<input type="text" maxlength="1" class="code-input" data-index="4">';
+    html += '<input type="text" maxlength="1" class="code-input" data-index="5">';
+    html += '</div>';
+    html += '<button class="btn btn-primary" onclick="verifyResetCode()"><i class="fas fa-check"></i> Verify</button>';
+    html += '<button class="btn-text" onclick="showForgotPassword()">Back</button>';
+    html += '</div>';
+    showModal(html);
+    
+    // Setup code inputs
+    setTimeout(function() {
+        var inputs = document.querySelectorAll('.code-input');
+        inputs.forEach(function(input, index) {
+            input.addEventListener('input', function(e) {
+                if (e.target.value.length === 1 && index < inputs.length - 1) {
+                    inputs[index + 1].focus();
+                }
+            });
+            input.addEventListener('keydown', function(e) {
+                if (e.key === 'Backspace' && !input.value && index > 0) {
+                    inputs[index - 1].focus();
+                }
+            });
+        });
+        inputs[0].focus();
+    }, 100);
+}
+
+function verifyResetCode() {
+    var inputs = document.querySelectorAll('.code-input');
+    var enteredCode = '';
+    inputs.forEach(function(input) {
+        enteredCode += input.value;
+    });
+    
+    if (enteredCode.length !== 6) {
+        showToast('Please enter all 6 digits', 'error');
+        return;
+    }
+    
+    if (enteredCode !== resetVerificationCode) {
+        showToast('Invalid code', 'error');
+        inputs.forEach(function(input) { input.value = ''; });
+        inputs[0].focus();
+        return;
+    }
+    
+    // Show password reset form
+    var html = '<div class="forgot-password-modal">';
+    html += '<div class="forgot-icon"><i class="fas fa-lock"></i></div>';
+    html += '<h3>Create New Password</h3>';
+    html += '<p>Enter your new password</p>';
+    html += '<div class="forgot-form">';
     html += '<div class="forgot-input">';
     html += '<i class="fas fa-lock"></i>';
     html += '<input type="password" id="reset-new-password" placeholder="New password">';
@@ -3613,10 +3704,49 @@ function showForgotPassword() {
     html += '<i class="fas fa-lock"></i>';
     html += '<input type="password" id="reset-confirm-password" placeholder="Confirm new password">';
     html += '</div>';
-    html += '<button class="btn btn-primary" onclick="sendPasswordReset()"><i class="fas fa-check"></i> Reset Password</button>';
+    html += '<button class="btn btn-primary" onclick="resetUserPassword()"><i class="fas fa-check"></i> Reset Password</button>';
     html += '<button class="btn-text" onclick="closeModal()">Cancel</button>';
     html += '</div></div>';
     showModal(html);
+}
+
+function resetUserPassword() {
+    var newPassword = document.getElementById('reset-new-password').value;
+    var confirmPassword = document.getElementById('reset-confirm-password').value;
+    
+    if (!newPassword || !confirmPassword) {
+        showToast('Please fill in all fields', 'error');
+        return;
+    }
+    
+    if (newPassword !== confirmPassword) {
+        showToast('Passwords do not match', 'error');
+        return;
+    }
+    
+    if (newPassword.length < 6) {
+        showToast('Password must be at least 6 characters', 'error');
+        return;
+    }
+    
+    var users = Storage.get('users') || [];
+    var userIndex = users.findIndex(function(u) { return u.email === resetUserEmail; });
+    
+    if (userIndex === -1) {
+        showToast('User not found', 'error');
+        return;
+    }
+    
+    // Update password
+    users[userIndex].password = hashPassword(newPassword);
+    Storage.set('users', users);
+    
+    // Clean up
+    resetVerificationCode = null;
+    resetUserEmail = null;
+    
+    closeModal();
+    showToast('Password reset successfully!', 'success');
 }
 
 function sendPasswordReset() {
