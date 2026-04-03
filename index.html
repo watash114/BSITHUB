@@ -99,13 +99,13 @@
                         <span>or continue with</span>
                     </div>
                     <div class="social-login">
-                        <button type="button" class="social-btn google" onclick="showToast('Google login coming soon', 'info')">
+                        <button type="button" class="social-btn google" onclick="socialLogin('google')">
                             <i class="fab fa-google"></i>
                         </button>
-                        <button type="button" class="social-btn facebook" onclick="showToast('Facebook login coming soon', 'info')">
+                        <button type="button" class="social-btn facebook" onclick="socialLogin('facebook')">
                             <i class="fab fa-facebook-f"></i>
                         </button>
-                        <button type="button" class="social-btn github" onclick="showToast('GitHub login coming soon', 'info')">
+                        <button type="button" class="social-btn github" onclick="socialLogin('github')">
                             <i class="fab fa-github"></i>
                         </button>
                     </div>
@@ -776,6 +776,7 @@
     <!-- Firebase SDK - Must load in this exact order -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
     <script src="js/firebase.js"></script>
     <script src="js/app.js"></script>
 </body>

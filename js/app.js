@@ -384,6 +384,85 @@ function login(email, password) {
     return { success: true };
 }
 
+function socialLogin(provider) {
+    var auth = firebase.auth();
+    var providerObj;
+    
+    switch(provider) {
+        case 'google':
+            providerObj = new firebase.auth.GoogleAuthProvider();
+            break;
+        case 'facebook':
+            providerObj = new firebase.auth.FacebookAuthProvider();
+            break;
+        case 'github':
+            providerObj = new firebase.auth.GithubAuthProvider();
+            break;
+        default:
+            showToast('Unknown provider', 'error');
+            return;
+    }
+    
+    auth.signInWithPopup(providerObj)
+        .then(function(result) {
+            var user = result.user;
+            console.log('Social login success:', user.displayName);
+            
+            // Check if user exists in our system
+            var users = Storage.get('users') || [];
+            var existingUser = users.find(function(u) { return u.email === user.email; });
+            
+            if (existingUser) {
+                // User exists - log them in
+                currentUser = existingUser;
+                Storage.set('currentUser', { id: existingUser.id });
+                showToast('Welcome back, ' + user.displayName + '!', 'success');
+                showApp();
+            } else {
+                // Create new user from social login
+                var newUser = {
+                    id: generateId(),
+                    name: user.displayName || 'User',
+                    username: user.email.split('@')[0],
+                    email: user.email,
+                    password: null, // No password for social login
+                    role: 'user',
+                    status: 'active',
+                    bio: '',
+                    phone: user.phoneNumber || '',
+                    location: '',
+                    createdAt: new Date().toISOString(),
+                    avatar: user.photoURL,
+                    blockedUsers: [],
+                    socialProvider: provider
+                };
+                
+                users.push(newUser);
+                Storage.set('users', users);
+                currentUser = newUser;
+                Storage.set('currentUser', { id: newUser.id });
+                
+                // Sync to Firebase
+                if (typeof syncUserToFirebase === 'function') {
+                    syncUserToFirebase(newUser);
+                }
+                
+                showToast('Welcome to BSITHUB, ' + user.displayName + '!', 'success');
+                showApp();
+            }
+        })
+        .catch(function(error) {
+            console.error('Social login error:', error);
+            if (error.code === 'auth/popup-closed-by-user') {
+                showToast('Login cancelled', 'info');
+            } else if (error.code === 'auth/account-exists-with-different-credential') {
+                showToast('Account already exists with different login method', 'error');
+            } else {
+                showToast('Login failed: ' + error.message, 'error');
+            }
+        });
+}
+
 function register(name, username, email, password) {
     const users = Storage.get('users') || [];
     if (users.find(function(u) { return u.email === email; })) return { success: false, message: 'Email already registered' };
