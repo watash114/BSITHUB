@@ -797,7 +797,8 @@ function openChat(chatId, userId) {
     document.querySelectorAll('.nav-item').forEach(function(i) { i.classList.remove('active'); });
     document.querySelectorAll('.content-section').forEach(function(s) { s.classList.remove('active'); });
     document.getElementById('chats-section').classList.add('active');
-    document.getElementById('chats-nav').classList.add('active');
+    var chatsNavItem = document.querySelector('.nav-item[data-section="chats"]');
+    if (chatsNavItem) chatsNavItem.classList.add('active');
     
     document.getElementById('chat-placeholder').style.display = 'none';
     document.getElementById('chat-active').style.display = 'flex';
@@ -1522,6 +1523,83 @@ function populateGifPicker(type) {
     });
 }
 
+function sendMessage(text) {
+    if (!activeChat || !text.trim()) return;
+    
+    var messages = Storage.get('messages') || [];
+    var newMessage = {
+        id: generateId(),
+        chatId: activeChat.id,
+        senderId: currentUser.id,
+        senderName: currentUser.name,
+        text: text.trim(),
+        timestamp: new Date().toISOString(),
+        read: false,
+        status: 'sent',
+        reactions: {},
+        edited: false,
+        starred: false,
+        replyTo: currentReplyTo,
+        forwarded: false
+    };
+    
+    // Save to local storage
+    messages.push(newMessage);
+    Storage.set('messages', messages);
+    
+    // Clear reply preview
+    clearReplyPreview();
+    
+    // Update UI immediately
+    renderMessages(activeChat.id);
+    loadChats();
+    
+    // Send to Firebase (async)
+    if (typeof sendMsgToFirebase === 'function') {
+        sendMsgToFirebase(newMessage)
+            .then(function() {
+                console.log('Message sent to Firebase!');
+                newMessage.status = 'delivered';
+                Storage.set('messages', messages);
+                renderMessages(activeChat.id);
+            })
+            .catch(function(err) {
+                console.error('Failed to send to Firebase:', err);
+            });
+    }
+    
+    // Play send sound
+    playSendSound();
+}
+
+function playSendSound() {
+    try {
+        var ctx = new (window.AudioContext || window.webkitAudioContext)();
+        var osc = ctx.createOscillator();
+        var gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.frequency.value = 800;
+        gain.gain.value = 0.1;
+        osc.start();
+        osc.stop(ctx.currentTime + 0.1);
+    } catch(e) {}
+}
+
+function playReceiveSound() {
+    try {
+        var ctx = new (window.AudioContext || window.webkitAudioContext)();
+        var osc = ctx.createOscillator();
+        var gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.frequency.value = 600;
+        gain.gain.value = 0.1;
+        osc.start();
+        osc.stop(ctx.currentTime + 0.15);
+    } catch(e) {}
+}
+
 function sendGif(gifUrl) {
     var messages = Storage.get('messages') || [];
     var newMessage = {
@@ -2153,7 +2231,7 @@ document.addEventListener('DOMContentLoaded', function() {
     };
     
     // Chat actions
-    document.getElementById('new-chat-btn').onclick = startNewChat;
+    document.getElementById('new-chat-btn').onclick = showNewChat;
     document.getElementById('send-btn').onclick = function() {
         var input = document.getElementById('message-input');
         sendMessage(input.value);
