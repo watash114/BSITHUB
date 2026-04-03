@@ -924,7 +924,6 @@ function openChat(chatId, userId) {
         if (item.dataset.chatId === chatId) item.classList.add('active');
     });
 }
-}
 
 // ==========================================
 // File & Media Functions
@@ -1560,12 +1559,6 @@ function sendGif(gifUrl) {
         });
     }
     
-    showToast('GIF sent!', 'success');
-}
-    
-    document.getElementById('gif-picker').style.display = 'none';
-    renderMessages(activeChat.id);
-    loadChats();
     showToast('GIF sent!', 'success');
 }
 
