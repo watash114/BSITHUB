@@ -3642,7 +3642,7 @@ function sendResetCode() {
             app_name: 'BSITHUB'
         };
         
-        emailjs.send('YOUR_SERVICE_ID', 'YOUR_TEMPLATE_ID', templateParams)
+        emailjs.send('service_32be10s', 'template_600032u', templateParams)
             .then(function(response) {
                 showToast('Verification code sent to ' + email, 'success');
                 showVerificationInput(email);
@@ -3679,7 +3679,9 @@ function showVerificationInput(email, showDemoCode) {
     html += '<input type="text" maxlength="1" class="code-input" data-index="5">';
     html += '</div>';
     html += '<button class="btn btn-primary" onclick="verifyResetCode()"><i class="fas fa-check"></i> Verify</button>';
-    html += '<button class="btn-text" onclick="showForgotPassword()">Back</button>';
+    html += '<div class="back-link">';
+    html += '<button class="btn-back" onclick="showForgotPassword()"><i class="fas fa-arrow-left"></i> Back to email</button>';
+    html += '</div>';
     html += '</div>';
     showModal(html);
     

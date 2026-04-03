@@ -4876,3 +4876,31 @@ body {
     width: 100%;
     margin-top: 5px;
 }
+
+/* Back Link */
+.back-link {
+    margin-top: 15px;
+    text-align: center;
+}
+
+.btn-back {
+    background: none;
+    border: none;
+    color: var(--primary);
+    font-size: 14px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 8px 15px;
+    border-radius: 8px;
+    transition: background 0.2s;
+}
+
+.btn-back:hover {
+    background: var(--bg-secondary);
+}
+
+.btn-back i {
+    font-size: 12px;
+}
