@@ -3936,6 +3936,182 @@ function showTermsOfService() {
 }
 
 // ==========================================
+// Video Calling (Stream API)
+// ==========================================
+var streamClient = null;
+var activeCall = null;
+var isVideoCallActive = false;
+
+// TODO: Replace with your Stream API credentials
+var STREAM_API_KEY = 'YOUR_STREAM_API_KEY';
+var STREAM_API_SECRET = 'YOUR_STREAM_API_SECRET';
+
+function startVideoCall() {
+    if (!activeChat) {
+        showToast('Select a chat first', 'info');
+        return;
+    }
+    
+    if (isVideoCallActive) {
+        showToast('Already in a call', 'info');
+        return;
+    }
+    
+    showModal('<div class="video-call-setup"><h3><i class="fas fa-video"></i> Start Video Call</h3><p>Video calling requires Stream API credentials.</p><div class="setup-steps"><a href="https://getstream.io/video/" target="_blank" class="setup-link"><i class="fas fa-external-link-alt"></i> Get Stream API Key</a></div><p class="setup-note">After getting your API key, update STREAM_API_KEY in app.js</p><button class="btn btn-primary" onclick="initVideoCall()"><i class="fas fa-phone"></i> Start Call</button><button class="btn" onclick="closeModal()">Cancel</button></div>');
+}
+
+async function initVideoCall() {
+    closeModal();
+    
+    if (STREAM_API_KEY === 'YOUR_STREAM_API_KEY') {
+        showToast('Please configure Stream API key first', 'error');
+        return;
+    }
+    
+    try {
+        // Initialize Stream client
+        if (!streamClient) {
+            streamClient = new StreamVideoClient({
+                apiKey: STREAM_API_KEY,
+                user: {
+                    id: currentUser.id,
+                    name: currentUser.name
+                }
+            });
+        }
+        
+        // Generate call ID
+        var callId = activeChat.id + '-' + Date.now();
+        
+        // Create/join call
+        activeCall = streamClient.call('default', callId);
+        await activeCall.join({ create: true });
+        
+        // Enable camera and microphone
+        await activeCall.camera.enable();
+        await activeCall.microphone.enable();
+        
+        // Show video call UI
+        showVideoCallUI();
+        
+        // Listen for participants
+        activeCall.on('call.session_participant_joined', function(event) {
+            console.log('Participant joined:', event.participant.user.name);
+            updateCallParticipants();
+        });
+        
+        activeCall.on('call.session_participant_left', function(event) {
+            console.log('Participant left:', event.participant.user.name);
+            updateCallParticipants();
+        });
+        
+        isVideoCallActive = true;
+        showToast('Video call started', 'success');
+        
+    } catch (error) {
+        console.error('Video call error:', error);
+        showToast('Could not start video call: ' + error.message, 'error');
+    }
+}
+
+function showVideoCallUI() {
+    var html = '<div class="video-call-overlay" id="video-call-overlay">';
+    html += '<div class="video-call-content">';
+    html += '<div class="video-grid" id="video-grid">';
+    html += '<div class="video-participant local" id="local-video">';
+    html += '<video id="local-video-element" autoplay muted playsinline></video>';
+    html += '<span class="participant-name">' + currentUser.name + ' (You)</span>';
+    html += '</div>';
+    html += '</div>';
+    html += '<div class="call-info">';
+    html += '<p id="call-status">Connecting...</p>';
+    html += '<p id="call-timer">00:00</p>';
+    html += '</div>';
+    html += '<div class="call-controls">';
+    html += '<button class="call-btn" id="toggle-camera" onclick="toggleCamera()"><i class="fas fa-video"></i></button>';
+    html += '<button class="call-btn" id="toggle-mic" onclick="toggleMic()"><i class="fas fa-microphone"></i></button>';
+    html += '<button class="call-btn call-end" onclick="endVideoCall()"><i class="fas fa-phone-slash"></i></button>';
+    html += '</div></div></div>';
+    
+    document.body.insertAdjacentHTML('beforeend', html);
+    
+    // Attach local video
+    if (activeCall) {
+        activeCall.camera.getLocalVideoElement().srcObject = document.getElementById('local-video-element').srcObject;
+    }
+}
+
+async function toggleCamera() {
+    if (!activeCall) return;
+    
+    var btn = document.getElementById('toggle-camera');
+    if (activeCall.camera.enabled) {
+        await activeCall.camera.disable();
+        btn.classList.add('disabled');
+    } else {
+        await activeCall.camera.enable();
+        btn.classList.remove('disabled');
+    }
+}
+
+async function toggleMic() {
+    if (!activeCall) return;
+    
+    var btn = document.getElementById('toggle-mic');
+    if (activeCall.microphone.enabled) {
+        await activeCall.microphone.disable();
+        btn.classList.add('disabled');
+    } else {
+        await activeCall.microphone.enable();
+        btn.classList.remove('disabled');
+    }
+}
+
+async function endVideoCall() {
+    if (activeCall) {
+        await activeCall.leave();
+        activeCall = null;
+    }
+    
+    isVideoCallActive = false;
+    
+    var overlay = document.getElementById('video-call-overlay');
+    if (overlay) overlay.remove();
+    
+    showToast('Call ended', 'info');
+}
+
+function updateCallParticipants() {
+    if (!activeCall) return;
+    
+    var participants = activeCall.state.participants;
+    var videoGrid = document.getElementById('video-grid');
+    if (!videoGrid) return;
+    
+    // Clear remote participants
+    var remoteVideos = videoGrid.querySelectorAll('.video-participant:not(.local)');
+    remoteVideos.forEach(function(v) { v.remove(); });
+    
+    // Add remote participants
+    participants.forEach(function(participant) {
+        if (participant.userId !== currentUser.id) {
+            var div = document.createElement('div');
+            div.className = 'video-participant remote';
+            div.innerHTML = '<video id="video-' + participant.userId + '" autoplay playsinline></video><span class="participant-name">' + participant.name + '</span>';
+            videoGrid.appendChild(div);
+            
+            // Attach video stream
+            var video = document.getElementById('video-' + participant.userId);
+            if (video && participant.videoStream) {
+                video.srcObject = participant.videoStream;
+            }
+        }
+    });
+    
+    document.getElementById('call-status').textContent = participants.length + ' participant(s)';
+}
+
+// ==========================================
 // Quick Actions Menu
 // ==========================================
 function showQuickActions() {
@@ -4307,6 +4483,9 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Quick Actions
     document.getElementById('quick-actions-btn').onclick = showQuickActions;
+    
+    // Video Call
+    document.getElementById('video-call-btn').onclick = startVideoCall;
     
     // Chat Options
     document.getElementById('chat-options-btn').onclick = showChatOptions;
