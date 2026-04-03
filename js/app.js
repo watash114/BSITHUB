@@ -3975,9 +3975,23 @@ async function initVideoCall() {
     closeModal();
     
     try {
-        // Check if VideoSDK is loaded
+        // Check if VideoSDK is loaded, if not load it dynamically
         if (typeof VideoSDK === 'undefined') {
-            showToast('VideoSDK not loaded. Please refresh.', 'error');
+            showToast('Loading VideoSDK...', 'info');
+            await new Promise(function(resolve, reject) {
+                var script = document.createElement('script');
+                script.src = 'https://cdn.videosdk.live/js-sdk/0.0.83/videosdk.js';
+                script.onload = resolve;
+                script.onerror = reject;
+                document.head.appendChild(script);
+            });
+            // Wait a bit for SDK to initialize
+            await new Promise(function(r) { setTimeout(r, 1000); });
+        }
+        
+        // Check again
+        if (typeof VideoSDK === 'undefined') {
+            showToast('VideoSDK not available. Please refresh.', 'error');
             return;
         }
         
