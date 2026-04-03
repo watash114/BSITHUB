@@ -1893,7 +1893,20 @@ function showGroupInfo() {
     if (!chat || !chat.isGroup) return;
     
     var users = Storage.get('users') || [];
+    // If no admin is set, the first participant is the admin
+    if (!chat.admin) {
+        chat.admin = chat.participants[0];
+        // Save the updated chat
+        var chats = Storage.get('chats') || [];
+        var chatIndex = chats.findIndex(function(c) { return c.id === chat.id; });
+        if (chatIndex !== -1) {
+            chats[chatIndex] = chat;
+            Storage.set('chats', chats);
+        }
+    }
     var isAdmin = chat.admin === currentUser.id;
+    
+    console.log('Group Info:', chat.groupName, 'Admin:', chat.admin, 'Current User:', currentUser.id, 'isAdmin:', isAdmin);
     
     var html = '<div class="group-info"><h3>' + escapeHtml(chat.groupName || 'Group') + '</h3>';
     html += '<p>' + chat.participants.length + ' members</p>';
