@@ -385,6 +385,16 @@ function login(email, password) {
 }
 
 function socialLogin(provider) {
+    // Initialize Firebase if not already done
+    if (typeof firebase !== 'undefined' && !firebase.apps.length) {
+        initFirebase();
+    }
+    
+    if (typeof firebase === 'undefined' || !firebase.apps.length) {
+        showToast('Firebase not ready. Please refresh.', 'error');
+        return;
+    }
+    
     var auth = firebase.auth();
     var providerObj;
     
@@ -3737,6 +3747,9 @@ function playConnectedSound() {
 // ==========================================
 document.addEventListener('DOMContentLoaded', function() {
     initializeDefaultData();
+    
+    // Initialize Firebase immediately
+    initFirebase();
     
     // Auth tabs
     document.querySelectorAll('.auth-tab').forEach(function(tab) {
