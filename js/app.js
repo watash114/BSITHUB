@@ -3936,30 +3936,158 @@ function showTermsOfService() {
 }
 
 // ==========================================
-// Video Calling (WebRTC + Firebase)
+// Video Calling (Jitsi Meet - Free, No API)
 // ==========================================
-var peerConnection = null;
-var localStream = null;
+var jitsiApi = null;
 var isVideoCallActive = false;
 var callTimer = null;
 var callSeconds = 0;
-var isMuted = false;
-var isCameraOff = false;
-var currentCallId = null;
-
-var iceServers = {
-    iceServers: [
-        { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:stun1.l.google.com:19302' },
-        { urls: 'stun:stun2.l.google.com:19302' }
-    ]
-};
 
 function startVideoCall() {
     if (!activeChat) {
         showToast('Select a chat first', 'info');
         return;
     }
+    
+    if (isVideoCallActive) {
+        showToast('Already in a call', 'info');
+        return;
+    }
+    
+    showModal('<div class="video-call-setup"><h3><i class="fas fa-video"></i> Video Call</h3><p>Start a video call using Jitsi (free)</p><button class="btn btn-primary" onclick="initVideoCall()"><i class="fas fa-phone"></i> Start Call</button><button class="btn" onclick="closeModal()">Cancel</button></div>');
+}
+
+function initVideoCall() {
+    closeModal();
+    
+    // Generate unique room name
+    var roomName = 'bsithub-' + activeChat.id + '-' + Date.now();
+    
+    // Show Jitsi container
+    showJitsiContainer(roomName);
+    
+    // Wait for container to render
+    setTimeout(function() {
+        var domain = 'meet.jitsi.si';
+        var options = {
+            roomName: roomName,
+            width: '100%',
+            height: '100%',
+            parentNode: document.getElementById('jitsi-container'),
+            userInfo: {
+                displayName: currentUser.name
+            },
+            configOverwrite: {
+                startWithAudioMuted: false,
+                startWithVideoMuted: false,
+                prejoinPageEnabled: false
+            },
+            interfaceConfigOverwrite: {
+                TOOLBAR_BUTTONS: [
+                    'microphone', 'camera', 'closedcaptions', 'desktop',
+                    'fullscreen', 'fodeviceselection', 'hangup', 'profile',
+                    'chat', 'recording', 'livestreaming', 'etherpad',
+                    'sharedvideo', 'settings', 'raisehand', 'videoquality',
+                    'filmstrip', 'invite', 'feedback', 'stats', 'shortcuts',
+                    'tileview', 'videobackgroundblur', 'download', 'help',
+                    'mute-everyone', 'security'
+                ],
+                SHOW_JITSI_WATERMARK: false,
+                SHOW_WATERMARK_FOR_GUESTS: false
+            }
+        };
+        
+        jitsiApi = new JitsiMeetExternalAPI(domain, options);
+        
+        // Handle ready event
+        jitsiApi.addEventListener('videoConferenceJoined', function() {
+            console.log('Joined video conference');
+            document.getElementById('call-status').textContent = 'Connected';
+            startCallTimer();
+        });
+        
+        // Handle participant joined
+        jitsiApi.addEventListener('participantJoined', function(data) {
+            console.log('Participant joined:', data);
+            updateParticipantCount();
+        });
+        
+        // Handle participant left
+        jitsiApi.addEventListener('participantLeft', function(data) {
+            console.log('Participant left:', data);
+            updateParticipantCount();
+        });
+        
+        // Handle leave
+        jitsiApi.addEventListener('readyToClose', function() {
+            endVideoCall();
+        });
+        
+        isVideoCallActive = true;
+        
+    }, 500);
+}
+
+function showJitsiContainer(roomName) {
+    var html = '<div class="video-call-overlay" id="video-call-overlay">';
+    html += '<div class="video-call-content" style="padding:0;">';
+    html += '<div id="jitsi-container" style="width:100%;height:calc(100% - 60px);"></div>';
+    html += '<div class="call-info" style="background:rgba(0,0,0,0.5);padding:10px;">';
+    html += '<p id="call-status">Connecting...</p>';
+    html += '<p id="call-id-display" style="font-size:12px;cursor:pointer;" onclick="copyCallId(\'' + roomName + '\')">Room: ' + roomName + ' (click to copy)</p>';
+    html += '<p id="call-timer">00:00</p>';
+    html += '</div>';
+    html += '<div class="call-controls" style="position:absolute;bottom:60px;right:20px;background:rgba(0,0,0,0.5);border-radius:25px;padding:10px;">';
+    html += '<button class="call-btn call-end" onclick="endVideoCall()" style="width:40px;height:40px;"><i class="fas fa-phone-slash"></i></button>';
+    html += '</div>';
+    html += '</div></div>';
+    
+    document.body.insertAdjacentHTML('beforeend', html);
+}
+
+function copyCallId(roomName) {
+    navigator.clipboard.writeText(roomName);
+    showToast('Room name copied! Share with others to join.', 'success');
+}
+
+function startCallTimer() {
+    callSeconds = 0;
+    callTimer = setInterval(function() {
+        callSeconds++;
+        var mins = Math.floor(callSeconds / 60).toString().padStart(2, '0');
+        var secs = (callSeconds % 60).toString().padStart(2, '0');
+        var timer = document.getElementById('call-timer');
+        if (timer) timer.textContent = mins + ':' + secs;
+    }, 1000);
+}
+
+function updateParticipantCount() {
+    if (jitsiApi) {
+        var count = jitsiApi.getNumberOfParticipants();
+        var status = document.getElementById('call-status');
+        if (status) status.textContent = count + ' participant(s)';
+    }
+}
+
+function endVideoCall() {
+    if (jitsiApi) {
+        jitsiApi.dispose();
+        jitsiApi = null;
+    }
+    
+    if (callTimer) {
+        clearInterval(callTimer);
+        callTimer = null;
+    }
+    
+    isVideoCallActive = false;
+    callSeconds = 0;
+    
+    var overlay = document.getElementById('video-call-overlay');
+    if (overlay) overlay.remove();
+    
+    showToast('Call ended', 'info');
+}
     
     if (isVideoCallActive) {
         showToast('Already in a call', 'info');
