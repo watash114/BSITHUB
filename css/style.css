@@ -55,16 +55,6 @@ body {
     display: block;
 }
 
-/* Version Badge */
-.version-badge {
-    display: inline-block;
-    background: rgba(255,255,255,0.2);
-    padding: 4px 12px;
-    border-radius: 12px;
-    font-size: 12px;
-    margin-top: 16px;
-}
-
 .version-info {
     display: flex;
     align-items: center;
@@ -377,22 +367,138 @@ body {
 .auth-brand {
     text-align: center;
     color: white;
+    padding: 40px;
 }
 
-.auth-brand i {
-    font-size: 80px;
-    margin-bottom: 24px;
+/* Logo with Animation */
+.brand-logo {
+    position: relative;
+    margin-bottom: 30px;
 }
 
-.auth-brand h1 {
-    font-size: 48px;
-    font-weight: 700;
-    margin-bottom: 12px;
+.logo-icon {
+    width: 120px;
+    height: 120px;
+    background: rgba(255,255,255,0.15);
+    border-radius: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto;
+    position: relative;
+    z-index: 2;
+    backdrop-filter: blur(10px);
+    border: 2px solid rgba(255,255,255,0.2);
+    animation: logo-float 3s ease-in-out infinite;
 }
 
-.auth-brand p {
+@keyframes logo-float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+}
+
+.logo-icon i {
+    font-size: 50px;
+    color: white;
+}
+
+.logo-particles {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 200px;
+    height: 200px;
+    transform: translate(-50%, -50%);
+}
+
+.logo-particles span {
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    background: rgba(255,255,255,0.6);
+    border-radius: 50%;
+    animation: particle 4s infinite;
+}
+
+.logo-particles span:nth-child(1) { top: 0; left: 50%; animation-delay: 0s; }
+.logo-particles span:nth-child(2) { top: 50%; right: 0; animation-delay: 0.5s; }
+.logo-particles span:nth-child(3) { bottom: 0; left: 50%; animation-delay: 1s; }
+.logo-particles span:nth-child(4) { top: 50%; left: 0; animation-delay: 1.5s; }
+.logo-particles span:nth-child(5) { top: 25%; right: 10%; animation-delay: 2s; }
+
+@keyframes particle {
+    0%, 100% { opacity: 0; transform: scale(0); }
+    50% { opacity: 1; transform: scale(1); }
+}
+
+/* Brand Title */
+.brand-title {
+    font-size: 52px;
+    font-weight: 800;
+    margin-bottom: 10px;
+    letter-spacing: 2px;
+    text-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    background: linear-gradient(135deg, #fff 0%, #e0e0ff 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.brand-tagline {
     font-size: 18px;
     opacity: 0.9;
+    margin-bottom: 40px;
+    font-weight: 300;
+    letter-spacing: 1px;
+}
+
+/* Features List */
+.brand-features {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 15px;
+    margin-bottom: 30px;
+}
+
+.feature-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: rgba(255,255,255,0.1);
+    padding: 12px 15px;
+    border-radius: 12px;
+    backdrop-filter: blur(5px);
+    border: 1px solid rgba(255,255,255,0.15);
+    transition: transform 0.3s, background 0.3s;
+}
+
+.feature-item:hover {
+    transform: translateY(-3px);
+    background: rgba(255,255,255,0.2);
+}
+
+.feature-item i {
+    font-size: 16px;
+    color: rgba(255,255,255,0.9);
+    width: 20px;
+    text-align: center;
+}
+
+.feature-item span {
+    font-size: 13px;
+    font-weight: 500;
+}
+
+/* Version Badge */
+.version-badge {
+    display: inline-block;
+    background: rgba(255,255,255,0.15);
+    padding: 6px 16px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    border: 1px solid rgba(255,255,255,0.2);
 }
 
 .auth-right {
