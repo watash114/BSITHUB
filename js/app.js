@@ -917,12 +917,13 @@ function openChat(chatId, userId) {
             }
         });
     }
+    
+    // Mark chat as active in sidebar
+    document.querySelectorAll('.chat-item').forEach(function(item) {
+        item.classList.remove('active');
+        if (item.dataset.chatId === chatId) item.classList.add('active');
+    });
 }
-
-document.querySelectorAll('.chat-item').forEach(function(item) {
-    item.classList.remove('active');
-    if (item.dataset.chatId === chatId) item.classList.add('active');
-});
 }
 
 // ==========================================
