@@ -389,7 +389,8 @@ function register(name, username, email, password) {
     if (users.find(function(u) { return u.email === email; })) return { success: false, message: 'Email already registered' };
     if (users.find(function(u) { return u.username === username; })) return { success: false, message: 'Username already taken' };
     
-    const newUser = {
+    // Store pending user data
+    window.pendingUser = {
         id: generateId(),
         name: name,
         username: username,
@@ -405,12 +406,120 @@ function register(name, username, email, password) {
         blockedUsers: []
     };
     
-    users.push(newUser);
-    Storage.set('users', users);
-    currentUser = newUser;
-    Storage.set('currentUser', { id: newUser.id });
-    addLog('info', 'New user registered: ' + username);
-    return { success: true };
+    // Generate verification code
+    window.verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+    
+    // Show verification modal
+    showVerificationModal();
+    
+    return { success: true, requiresVerification: true };
+}
+
+function showVerificationModal() {
+    var modal = document.getElementById('verification-modal');
+    var codeDisplay = document.getElementById('verification-code-display');
+    
+    // Show code for demo (in real app, this would be sent via email)
+    codeDisplay.innerHTML = '<div class="demo-code"><small>Your verification code (demo):</small><strong>' + window.verificationCode + '</strong></div>';
+    
+    modal.style.display = 'flex';
+    
+    // Focus first input
+    setTimeout(function() {
+        document.querySelector('.code-input[data-index="0"]').focus();
+    }, 100);
+}
+
+function setupCodeInputs() {
+    var inputs = document.querySelectorAll('.code-input');
+    inputs.forEach(function(input, index) {
+        input.addEventListener('input', function(e) {
+            var value = e.target.value;
+            if (value.length === 1 && index < inputs.length - 1) {
+                inputs[index + 1].focus();
+            }
+        });
+        
+        input.addEventListener('keydown', function(e) {
+            if (e.key === 'Backspace' && !input.value && index > 0) {
+                inputs[index - 1].focus();
+            }
+        });
+        
+        input.addEventListener('paste', function(e) {
+            e.preventDefault();
+            var paste = (e.clipboardData || window.clipboardData).getData('text');
+            var chars = paste.replace(/\D/g, '').split('').slice(0, 6);
+            chars.forEach(function(char, i) {
+                if (inputs[i]) {
+                    inputs[i].value = char;
+                }
+            });
+            if (chars.length > 0) {
+                inputs[Math.min(chars.length, inputs.length - 1)].focus();
+            }
+        });
+    });
+}
+
+function verifyCode() {
+    var inputs = document.querySelectorAll('.code-input');
+    var enteredCode = '';
+    inputs.forEach(function(input) {
+        enteredCode += input.value;
+    });
+    
+    if (enteredCode.length !== 6) {
+        showToast('Please enter all 6 digits', 'error');
+        return;
+    }
+    
+    if (enteredCode === window.verificationCode) {
+        // Code is correct - complete registration
+        var users = Storage.get('users') || [];
+        users.push(window.pendingUser);
+        Storage.set('users', users);
+        currentUser = window.pendingUser;
+        Storage.set('currentUser', { id: window.pendingUser.id });
+        
+        // Clean up
+        window.pendingUser = null;
+        window.verificationCode = null;
+        
+        addLog('info', 'New user registered: ' + currentUser.username);
+        
+        // Hide modal
+        document.getElementById('verification-modal').style.display = 'none';
+        
+        showToast('Email verified! Welcome to BSITHUB!', 'success');
+        showApp();
+    } else {
+        showToast('Invalid verification code', 'error');
+        // Clear inputs
+        inputs.forEach(function(input) {
+            input.value = '';
+        });
+        inputs[0].focus();
+    }
+}
+
+function resendCode() {
+    window.verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+    var codeDisplay = document.getElementById('verification-code-display');
+    codeDisplay.innerHTML = '<div class="demo-code"><small>New code (demo):</small><strong>' + window.verificationCode + '</strong></div>';
+    showToast('New code generated!', 'info');
+}
+
+function cancelVerification() {
+    window.pendingUser = null;
+    window.verificationCode = null;
+    document.getElementById('verification-modal').style.display = 'none';
+    
+    // Clear inputs
+    var inputs = document.querySelectorAll('.code-input');
+    inputs.forEach(function(input) {
+        input.value = '';
+    });
 }
 
 function logout() {
@@ -3660,13 +3769,21 @@ document.addEventListener('DOMContentLoaded', function() {
         
         var result = register(name, username, email, password);
         if (result.success) {
-            showToast('Account created!', 'success');
-            showApp();
+            if (result.requiresVerification) {
+                // Show verification modal
+                showToast('Verification code sent!', 'info');
+            } else {
+                showToast('Account created!', 'success');
+                showApp();
+            }
         } else {
             document.getElementById('register-error').textContent = result.message;
             document.getElementById('register-error').style.display = 'block';
         }
     };
+    
+    // Setup code inputs for verification
+    setupCodeInputs();
     
     // Chat actions
     document.getElementById('new-chat-btn').onclick = showNewChat;
