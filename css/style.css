@@ -2853,6 +2853,19 @@ body {
     border-radius: 8px;
 }
 
+/* Audio Player */
+.message-audio {
+    margin: 5px 0;
+    min-width: 200px;
+    max-width: 280px;
+}
+
+.message-audio audio {
+    width: 100%;
+    height: 36px;
+    border-radius: 18px;
+}
+
 /* Video Player */
 .message-video {
     max-width: 300px;
