@@ -4592,3 +4592,49 @@ body {
 #quick-actions-btn:hover {
     color: #ff9800;
 }
+
+/* Setup Instructions Modal */
+.setup-instructions {
+    text-align: center;
+    padding: 10px;
+}
+
+.setup-instructions h3 {
+    margin-bottom: 15px;
+}
+
+.setup-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    margin: 20px 0;
+}
+
+.setup-link {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 15px 20px;
+    background: var(--primary);
+    color: white;
+    text-decoration: none;
+    border-radius: 10px;
+    font-weight: 500;
+    transition: all 0.3s;
+}
+
+.setup-link:hover {
+    background: #5a6fd6;
+    transform: translateY(-2px);
+}
+
+.setup-link i {
+    font-size: 20px;
+}
+
+.setup-note {
+    color: var(--text-secondary);
+    font-size: 13px;
+    margin: 15px 0;
+}

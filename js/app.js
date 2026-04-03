@@ -472,8 +472,8 @@ function socialLogin(provider) {
             if (error.code === 'auth/popup-closed-by-user') {
                 showToast('Login cancelled', 'info');
             } else if (error.code === 'auth/configuration-not-found' || error.code === 'auth/unauthorized-domain') {
-                // Show setup instructions
-                showModal('<div class="setup-instructions"><h3>Setup Required</h3><p>To enable social login, you need to:</p><ol><li>Go to <a href="https://console.firebase.google.com/project/bsithub-1974a/authentication/providers" target="_blank">Firebase Console</a></li><li>Click <strong>Authentication</strong> → <strong>Sign-in method</strong></li><li>Enable <strong>Google</strong> provider</li><li>Click <strong>Save</strong></li><li>Go to <strong>Settings</strong> (gear icon) → <strong>Authorized domains</strong></li><li>Click <strong>Add domain</strong></li><li>Add: <code>bsithub.vercel.app</code></li><li>Click <strong>Add</strong></li></ol><p><strong>Then try again!</strong></p><button class="btn btn-primary" onclick="closeModal()">Got it</button></div>');
+                // Show setup instructions with direct links
+                showModal('<div class="setup-instructions"><h3>Setup Required</h3><p>Click the links below to enable social login:</p><div class="setup-steps"><a href="https://console.firebase.google.com/project/bsithub-1974a/authentication/providers" target="_blank" class="setup-link"><i class="fab fa-google"></i> Step 1: Enable Google Provider</a><a href="https://console.firebase.google.com/project/bsithub-1974a/authentication/settings" target="_blank" class="setup-link"><i class="fas fa-globe"></i> Step 2: Add Domain (bsithub.vercel.app)</a></div><p class="setup-note">After completing both steps, click Done and try again.</p><button class="btn btn-primary" onclick="closeModal()">Done</button></div>');
             } else if (error.code === 'auth/account-exists-with-different-credential') {
                 showToast('Account already exists with different login method', 'error');
             } else {
