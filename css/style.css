@@ -231,13 +231,13 @@ body {
 
 /* Form Elements */
 .form-group {
-    margin-bottom: 20px;
+    margin-bottom: 15px;
 }
 
 .form-group label {
     display: block;
-    margin-bottom: 8px;
-    font-size: 14px;
+    margin-bottom: 6px;
+    font-size: 13px;
     font-weight: 500;
     color: var(--text-primary);
 }
@@ -364,6 +364,7 @@ body {
     padding: 40px;
     position: relative;
     overflow: hidden;
+    min-width: 450px;
 }
 
 /* Animated Particles */
@@ -674,8 +675,7 @@ body {
     flex-direction: column;
     justify-content: center;
     padding: 40px;
-    max-width: 480px;
-    margin: 0 auto;
+    background: var(--bg-primary);
 }
 
 .auth-tabs {
