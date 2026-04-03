@@ -952,9 +952,13 @@ function renderMessages(chatId) {
         html += '<div class="message ' + (isSent ? 'sent' : 'received') + '" data-message-id="' + msg.id + '">';
         html += '<div class="message-bubble">';
         
-        // Check for GIF
+        // Check for GIF or large emoji
         if (msg.gifUrl) {
             html += '<div class="message-gif"><img src="' + msg.gifUrl + '" alt="GIF" class="gif-image"></div>';
+        }
+        // Check for emoji message (large display)
+        else if (msg.isEmoji) {
+            html += '<div class="message-emoji-large">' + msg.text + '</div>';
         }
         // Check for image
         else if (msg.fileData && msg.fileType && msg.fileType.startsWith('image/')) {
@@ -1866,38 +1870,77 @@ function searchGifs(query) {
 
 function populateGifPicker(type) {
     var grid = document.getElementById('gif-grid');
-    grid.innerHTML = '<div class="gif-loading"><i class="fas fa-spinner fa-spin"></i> Loading GIFs...</div>';
     
-    // Use Giphy API to fetch trending GIFs
-    var apiKey = 'dc6zaTOxFJmzC'; // Giphy public beta key
-    var url = 'https://api.giphy.com/v1/gifs/trending?api_key=' + apiKey + '&limit=16&rating=g';
+    // Simple animated emoji GIFs that don't require external APIs
+    var gifs = [
+        { emoji: '😂', label: 'LOL' },
+        { emoji: '❤️', label: 'Love' },
+        { emoji: '👍', label: 'Thumbs Up' },
+        { emoji: '🎉', label: 'Party' },
+        { emoji: '🔥', label: 'Fire' },
+        { emoji: '😍', label: 'Heart Eyes' },
+        { emoji: '🤣', label: 'Rolling' },
+        { emoji: '😎', label: 'Cool' },
+        { emoji: '🥳', label: 'Celebrate' },
+        { emoji: '😢', label: 'Crying' },
+        { emoji: '😮', label: 'Wow' },
+        { emoji: '🤗', label: 'Hug' },
+        { emoji: '💀', label: 'Dead' },
+        { emoji: '🙄', label: 'Eye Roll' },
+        { emoji: '😴', label: 'Sleepy' },
+        { emoji: '🤯', label: 'Mind Blown' }
+    ];
     
-    fetch(url)
-        .then(function(response) { return response.json(); })
-        .then(function(data) {
-            grid.innerHTML = '';
-            if (data.data && data.data.length > 0) {
-                data.data.forEach(function(gif) {
-                    var item = document.createElement('div');
-                    item.className = 'gif-item';
-                    var img = document.createElement('img');
-                    img.src = gif.images.fixed_height_small.url;
-                    img.alt = gif.title || 'GIF';
-                    img.loading = 'lazy';
-                    item.appendChild(img);
-                    item.onclick = function() {
-                        sendGif(gif.images.fixed_height.url);
-                    };
-                    grid.appendChild(item);
-                });
-            } else {
-                grid.innerHTML = '<div class="gif-no-results">No GIFs available</div>';
-            }
-        })
-        .catch(function(error) {
-            console.error('GIF fetch error:', error);
-            grid.innerHTML = '<div class="gif-no-results">Could not load GIFs. Try again later.</div>';
+    grid.innerHTML = '';
+    gifs.forEach(function(gif) {
+        var item = document.createElement('div');
+        item.className = 'gif-item';
+        item.innerHTML = '<span class="gif-emoji">' + gif.emoji + '</span><span class="gif-label">' + gif.label + '</span>';
+        item.onclick = function() {
+            sendGifEmoji(gif.emoji);
+        };
+        grid.appendChild(item);
+    });
+}
+
+function sendGifEmoji(emoji) {
+    var messages = Storage.get('messages') || [];
+    var newMessage = {
+        id: generateId(),
+        chatId: activeChat.id,
+        senderId: currentUser.id,
+        senderName: currentUser.name,
+        text: emoji,
+        isEmoji: true,
+        timestamp: new Date().toISOString(),
+        read: false,
+        status: 'sent',
+        reactions: {},
+        edited: false,
+        starred: false,
+        replyTo: null,
+        forwarded: false
+    };
+    
+    // Save locally
+    messages.push(newMessage);
+    Storage.set('messages', messages);
+    
+    // Update UI
+    document.getElementById('gif-picker').style.display = 'none';
+    renderMessages(activeChat.id);
+    loadChats();
+    
+    // Send to Firebase
+    if (typeof sendMsgToFirebase === 'function') {
+        sendMsgToFirebase(newMessage).then(function() {
+            newMessage.status = 'delivered';
+            Storage.set('messages', messages);
+            renderMessages(activeChat.id);
         });
+    }
+    
+    showToast('Sent!', 'success');
 }
 
 function sendMessage(text) {
