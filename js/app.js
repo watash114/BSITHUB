@@ -716,6 +716,29 @@ function loadChats() {
             openChat(item.dataset.chatId, item.dataset.userId);
         };
     });
+    
+    // Update total unread badge in sidebar
+    updateUnreadBadge();
+}
+
+function updateUnreadBadge() {
+    var chats = Storage.get('chats') || [];
+    var messages = Storage.get('messages') || [];
+    
+    var myChats = chats.filter(function(c) { return c.participants.indexOf(currentUser.id) !== -1 && !c.archived; });
+    
+    var totalUnread = 0;
+    myChats.forEach(function(chat) {
+        var chatMessages = messages.filter(function(m) { return m.chatId === chat.id; });
+        var unreadCount = chatMessages.filter(function(m) { return !m.read && m.senderId !== currentUser.id; }).length;
+        totalUnread += unreadCount;
+    });
+    
+    var badge = document.getElementById('chat-badge');
+    if (badge) {
+        badge.textContent = totalUnread;
+        badge.style.display = totalUnread > 0 ? 'inline' : 'none';
+    }
 }
 
 function loadChatsWithUnread() {
@@ -945,6 +968,9 @@ function renderMessages(chatId) {
         }
     });
     Storage.set('messages', messages);
+    
+    // Update unread badge
+    updateUnreadBadge();
     
     var html = '';
     chatMessages.forEach(function(msg) {
