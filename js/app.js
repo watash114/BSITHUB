@@ -1912,15 +1912,12 @@ function showGroupInfo() {
     
     var isAdmin = chat.admin === currentUser.id;
     
-    // Debug alert - remove later
-    alert('Admin: ' + chat.admin + '\nYour ID: ' + currentUser.id + '\nisAdmin: ' + isAdmin);
-    
     console.log('Group:', chat.groupName, '| Admin ID:', chat.admin, '| Your ID:', currentUser.id, '| isAdmin:', isAdmin);
     
     var html = '<div class="group-info"><h3>' + escapeHtml(chat.groupName || 'Group') + '</h3>';
     html += '<p>' + chat.participants.length + ' members</p>';
     
-    // Show Add Members button for ALL users (for testing)
+    // Show Add Members button for all members
     html += '<button class="btn btn-primary" onclick="showAddMembers()"><i class="fas fa-user-plus"></i> Add Members</button>';
     
     html += '<div class="group-members-list">';
