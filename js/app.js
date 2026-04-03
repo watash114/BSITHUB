@@ -1866,43 +1866,39 @@ function searchGifs(query) {
 
 function populateGifPicker(type) {
     var grid = document.getElementById('gif-grid');
+    grid.innerHTML = '<div class="gif-loading"><i class="fas fa-spinner fa-spin"></i> Loading GIFs...</div>';
     
-    // Reliable GIF URLs
-    var gifs = [
-        'https://media1.tenor.com/m/R9dRj4N5GmoAAAAC/hello-wave.gif',
-        'https://media1.tenor.com/m/y7UvHqh0vYMAAAAC/hi-hello.gif',
-        'https://media1.tenor.com/m/j-8UkMCCV9IAAAAC/thumbs-up-ok.gif',
-        'https://media1.tenor.com/m/abM2UoHKwFwAAAAC/happy-yes.gif',
-        'https://media1.tenor.com/m/1tAaEnS9V7oAAAAC/laughing-haha.gif',
-        'https://media1.tenor.com/m/QUxKqo9kDIAAAAC/cry-sad.gif',
-        'https://media1.tenor.com/m/2y6MRfMN_s0AAAAC/love-heart.gif',
-        'https://media1.tenor.com/m/TgBbfdl6hVUAAAAC/cool-awesome.gif',
-        'https://media1.tenor.com/m/YFn3SJ0UMpAAAAAC/funny-lol.gif',
-        'https://media1.tenor.com/m/MJLBEe6eqBIAAAAC/dance-dancing.gif',
-        'https://media1.tenor.com/m/1WJsHTNMNnUAAAAC/applause-clap.gif',
-        'https://media1.tenor.com/m/GfWZVu8K2ysAAAAC/thinking-hmm.gif',
-        'https://media1.tenor.com/m/nL9gE2z2se4AAAAC/surprised-wow.gif',
-        'https://media1.tenor.com/m/qKdDMN2VjKwAAAAC/sleepy-tired.gif',
-        'https://media1.tenor.com/m/fL3m6MJRkVUAAAAC/angry-mad.gif',
-        'https://media1.tenor.com/m/NxYJgGHm1FIAAAAC/cool-nice.gif'
-    ];
+    // Use Giphy API to fetch trending GIFs
+    var apiKey = 'dc6zaTOxFJmzC'; // Giphy public beta key
+    var url = 'https://api.giphy.com/v1/gifs/trending?api_key=' + apiKey + '&limit=16&rating=g';
     
-    grid.innerHTML = '';
-    gifs.forEach(function(gifUrl) {
-        var item = document.createElement('div');
-        item.className = 'gif-item';
-        var img = document.createElement('img');
-        img.src = gifUrl;
-        img.alt = 'GIF';
-        img.onerror = function() {
-            this.parentElement.style.display = 'none';
-        };
-        item.appendChild(img);
-        item.onclick = function() {
-            sendGif(gifUrl);
-        };
-        grid.appendChild(item);
-    });
+    fetch(url)
+        .then(function(response) { return response.json(); })
+        .then(function(data) {
+            grid.innerHTML = '';
+            if (data.data && data.data.length > 0) {
+                data.data.forEach(function(gif) {
+                    var item = document.createElement('div');
+                    item.className = 'gif-item';
+                    var img = document.createElement('img');
+                    img.src = gif.images.fixed_height_small.url;
+                    img.alt = gif.title || 'GIF';
+                    img.loading = 'lazy';
+                    item.appendChild(img);
+                    item.onclick = function() {
+                        sendGif(gif.images.fixed_height.url);
+                    };
+                    grid.appendChild(item);
+                });
+            } else {
+                grid.innerHTML = '<div class="gif-no-results">No GIFs available</div>';
+            }
+        })
+        .catch(function(error) {
+            console.error('GIF fetch error:', error);
+            grid.innerHTML = '<div class="gif-no-results">Could not load GIFs. Try again later.</div>';
+        });
+}
 }
 
 function sendMessage(text) {
