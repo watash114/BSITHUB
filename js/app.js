@@ -500,9 +500,23 @@ function socialLogin(provider) {
                     setupHtml += '</div>';
                     
                     if (provider === 'facebook') {
-                        setupHtml += '<p class="setup-note">Facebook requires a Facebook App ID. <a href="https://developers.facebook.com/" target="_blank">Create one here</a>.</p>';
+                        setupHtml += '<p class="setup-note"><strong>Facebook Setup:</strong></p>';
+                        setupHtml += '<ol style="text-align:left; margin: 10px 0;">';
+                        setupHtml += '<li>Go to <a href="https://developers.facebook.com/apps" target="_blank">Facebook Developers</a></li>';
+                        setupHtml += '<li>Click your app → Settings → Basic</li>';
+                        setupHtml += '<li>Copy <strong>App ID</strong> and <strong>App Secret</strong></li>';
+                        setupHtml += '<li>Go to <a href="https://console.firebase.google.com/project/bsithub-1974a/authentication/providers" target="_blank">Firebase Console</a></li>';
+                        setupHtml += '<li>Enable Facebook → Paste App ID and App Secret → Save</li>';
+                        setupHtml += '</ol>';
                     } else if (provider === 'github') {
-                        setupHtml += '<p class="setup-note">GitHub requires an OAuth App. <a href="https://github.com/settings/developers" target="_blank">Create one here</a>.</p>';
+                        setupHtml += '<p class="setup-note"><strong>GitHub Setup:</strong></p>';
+                        setupHtml += '<ol style="text-align:left; margin: 10px 0;">';
+                        setupHtml += '<li>Go to <a href="https://github.com/settings/developers" target="_blank">GitHub Developers</a></li>';
+                        setupHtml += '<li>Create OAuth App with callback: <code>https://bsithub-1974a.firebaseapp.com/__/auth/handler</code></li>';
+                        setupHtml += '<li>Copy <strong>Client ID</strong> and <strong>Client Secret</strong></li>';
+                        setupHtml += '<li>Go to <a href="https://console.firebase.google.com/project/bsithub-1974a/authentication/providers" target="_blank">Firebase Console</a></li>';
+                        setupHtml += '<li>Enable GitHub → Paste Client ID and Client Secret → Save</li>';
+                        setupHtml += '</ol>';
                     }
                     
                     setupHtml += '<p class="setup-note">After completing steps, click Done and try again.</p>';
