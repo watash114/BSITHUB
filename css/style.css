@@ -2852,14 +2852,14 @@ body {
 /* Audio Player */
 .message-audio {
     margin: 5px 0;
-    min-width: 200px;
-    max-width: 280px;
+    max-width: 100%;
 }
 
 .message-audio audio {
     width: 100%;
-    height: 36px;
-    border-radius: 18px;
+    max-width: 250px;
+    height: 40px;
+    border-radius: 20px;
 }
 
 /* Video Player */
@@ -2984,6 +2984,8 @@ body {
 .message-bubble {
     position: relative;
     max-width: 70%;
+    min-width: 100px;
+    overflow: hidden;
 }
 
 .message.sent .message-bubble {
