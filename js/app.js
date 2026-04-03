@@ -3944,7 +3944,7 @@ var isVideoCallActive = false;
 
 // TODO: Replace with your Stream API credentials
 var STREAM_API_KEY = '4jqs69zq736j';
-var STREAM_API_SECRET = 'YOUR_STREAM_API_SECRET';
+var STREAM_API_SECRET = 'nuay2t8ychkd4rxdynqcutcz793bvsabntc5hzr86qrrca94hntjrgjjb3f9gj6t';
 
 function startVideoCall() {
     if (!activeChat) {
