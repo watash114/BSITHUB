@@ -2738,21 +2738,68 @@ function toggleVoiceMessage() {
         return;
     }
     
-    showModal('<div class="voice-message"><h3>Voice Message</h3><p>Click to start recording</p><button class="btn btn-primary" id="record-btn" onclick="startRecording()"><i class="fas fa-microphone"></i> Record</button></div>');
+    showModal('<div class="voice-message"><h3>Voice Message</h3><div class="voice-recording-ui"><div class="voice-wave" id="voice-wave"></div><p id="recording-status">Click to start recording</p><p id="recording-time" style="display:none;">00:00</p></div><button class="btn btn-primary voice-record-btn" id="record-btn" onclick="startRecording()"><i class="fas fa-microphone"></i> Record</button></div>');
 }
 
+var recordingTimer = null;
+var recordingSeconds = 0;
+
 function startRecording() {
-    navigator.mediaDevices.getUserMedia({ audio: true })
+    // Enhanced audio constraints for better quality
+    var constraints = {
+        audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+            sampleRate: 44100,
+            channelCount: 1
+        }
+    };
+    
+    navigator.mediaDevices.getUserMedia(constraints)
         .then(function(stream) {
-            var mediaRecorder = new MediaRecorder(stream);
+            // Use webm with opus codec for better quality
+            var options = { mimeType: 'audio/webm;codecs=opus' };
+            
+            // Fallback if opus not supported
+            if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+                options = { mimeType: 'audio/webm' };
+                if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+                    options = { mimeType: 'audio/mp4' };
+                    if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+                        options = {};
+                    }
+                }
+            }
+            
+            var mediaRecorder = new MediaRecorder(stream, options);
             var audioChunks = [];
             
+            // Start timer
+            recordingSeconds = 0;
+            var timeDisplay = document.getElementById('recording-time');
+            var statusDisplay = document.getElementById('recording-status');
+            timeDisplay.style.display = 'block';
+            statusDisplay.textContent = 'Recording...';
+            
+            recordingTimer = setInterval(function() {
+                recordingSeconds++;
+                var mins = Math.floor(recordingSeconds / 60).toString().padStart(2, '0');
+                var secs = (recordingSeconds % 60).toString().padStart(2, '0');
+                timeDisplay.textContent = mins + ':' + secs;
+            }, 1000);
+            
             mediaRecorder.ondataavailable = function(e) {
-                audioChunks.push(e.data);
+                if (e.data.size > 0) {
+                    audioChunks.push(e.data);
+                }
             };
             
             mediaRecorder.onstop = function() {
-                var audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                // Clear timer
+                clearInterval(recordingTimer);
+                
+                var audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType || 'audio/webm' });
                 var reader = new FileReader();
                 reader.onload = function(event) {
                     var messages = Storage.get('messages') || [];
@@ -2794,13 +2841,18 @@ function startRecording() {
                 stream.getTracks().forEach(function(track) { track.stop(); });
             };
             
-            mediaRecorder.start();
-            document.getElementById('record-btn').innerHTML = '<i class="fas fa-stop"></i> Stop';
-            document.getElementById('record-btn').onclick = function() {
+            // Start recording with timeslice for better chunks
+            mediaRecorder.start(100);
+            
+            var recordBtn = document.getElementById('record-btn');
+            recordBtn.innerHTML = '<i class="fas fa-stop"></i> Stop';
+            recordBtn.classList.add('recording');
+            recordBtn.onclick = function() {
                 mediaRecorder.stop();
             };
         })
         .catch(function(err) {
+            console.error('Microphone error:', err);
             showToast('Microphone access denied', 'error');
         });
 }

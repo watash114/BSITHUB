@@ -1247,6 +1247,62 @@ body {
     height: 36px;
 }
 
+/* Voice Recording Modal */
+.voice-message {
+    text-align: center;
+    padding: 20px;
+}
+
+.voice-message h3 {
+    margin-bottom: 20px;
+}
+
+.voice-recording-ui {
+    margin-bottom: 20px;
+}
+
+.voice-wave {
+    height: 60px;
+    background: linear-gradient(90deg, var(--primary) 0%, transparent 100%);
+    border-radius: 30px;
+    margin-bottom: 15px;
+    opacity: 0.3;
+    animation: wave-pulse 1s infinite;
+}
+
+@keyframes wave-pulse {
+    0%, 100% { opacity: 0.3; transform: scaleY(1); }
+    50% { opacity: 0.6; transform: scaleY(1.2); }
+}
+
+.recording-status {
+    font-size: 16px;
+    color: var(--text-primary);
+}
+
+.recording-time {
+    font-size: 32px;
+    font-weight: 600;
+    color: var(--primary);
+    font-family: monospace;
+}
+
+.voice-record-btn {
+    width: 100%;
+    padding: 15px;
+    font-size: 16px;
+}
+
+.voice-record-btn.recording {
+    background: #ff4d4d;
+    animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+}
+
 .voice-play-btn {
     width: 36px;
     height: 36px;
