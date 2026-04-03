@@ -4088,14 +4088,19 @@ function endVideoCall() {
     
     showToast('Call ended', 'info');
 }
+
+function startVideoCall() {
+    if (!activeChat) {
+        showToast('Select a chat first', 'info');
+        return;
+    }
     
     if (isVideoCallActive) {
         showToast('Already in a call', 'info');
         return;
     }
     
-    // Show options modal
-    showModal('<div class="video-call-setup"><h3><i class="fas fa-video"></i> Video Call</h3><p>Start a new call or join an existing one</p><button class="btn btn-primary" onclick="initVideoCall()"><i class="fas fa-phone"></i> Start New Call</button><button class="btn" onclick="showJoinCallModal()"><i class="fas fa-sign-in-alt"></i> Join with Meeting ID</button><button class="btn" onclick="closeModal()">Cancel</button></div>');
+    showModal('<div class="video-call-setup"><h3><i class="fas fa-video"></i> Video Call</h3><p>Start a video call using Jitsi (free)</p><button class="btn btn-primary" onclick="initVideoCall()"><i class="fas fa-phone"></i> Start Call</button><button class="btn" onclick="closeModal()">Cancel</button></div>');
 }
 
 async function initVideoCall() {
