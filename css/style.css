@@ -4338,7 +4338,57 @@ body {
     color: white;
 }
 
-/* Voice Call Button in Chat Header */
-#voice-call-btn:hover {
-    color: #4CAF50;
+/* Quick Actions Menu */
+.quick-actions-menu {
+    text-align: center;
+    padding: 10px;
+}
+
+.quick-actions-menu h3 {
+    margin-bottom: 20px;
+}
+
+.quick-actions-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 15px;
+}
+
+.quick-action-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 20px 10px;
+    background: var(--bg-secondary);
+    border: 2px solid var(--border);
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.quick-action-btn:hover {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+    transform: translateY(-3px);
+}
+
+.quick-action-btn i {
+    font-size: 24px;
+    color: var(--primary);
+}
+
+.quick-action-btn:hover i {
+    color: white;
+}
+
+.quick-action-btn span {
+    font-size: 12px;
+    font-weight: 500;
+}
+
+/* Quick Actions Button */
+#quick-actions-btn:hover {
+    color: #ff9800;
 }

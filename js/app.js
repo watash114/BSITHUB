@@ -3405,216 +3405,130 @@ function showTermsOfService() {
 }
 
 // ==========================================
-// Voice Call (WebRTC)
+// Quick Actions Menu
 // ==========================================
-var localStream = null;
-var peerConnection = null;
-var callTimer = null;
-var callSeconds = 0;
-var isInCall = false;
-var isCaller = false;
-var callRecipient = null;
-
-var iceServers = {
-    iceServers: [
-        { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:stun1.l.google.com:19302' }
-    ]
-};
-
-function startVoiceCall() {
+function showQuickActions() {
     if (!activeChat) {
         showToast('Select a chat first', 'info');
         return;
     }
     
-    if (isInCall) {
-        showToast('Already in a call', 'info');
+    var html = '<div class="quick-actions-menu">';
+    html += '<h3>Quick Actions</h3>';
+    html += '<div class="quick-actions-grid">';
+    
+    html += '<button class="quick-action-btn" onclick="shareLocation()">';
+    html += '<i class="fas fa-map-marker-alt"></i>';
+    html += '<span>Share Location</span>';
+    html += '</button>';
+    
+    html += '<button class="quick-action-btn" onclick="sendQuickReply(\'👍\')">';
+    html += '<i class="fas fa-thumbs-up"></i>';
+    html += '<span>Quick Like</span>';
+    html += '</button>';
+    
+    html += '<button class="quick-action-btn" onclick="sendQuickReply(\'👋\')">';
+    html += '<i class="fas fa-hand-paper"></i>';
+    html += '<span>Quick Wave</span>';
+    html += '</button>';
+    
+    html += '<button class="quick-action-btn" onclick="sendQuickReply(\'❤️\')">';
+    html += '<i class="fas fa-heart"></i>';
+    html += '<span>Quick Heart</span>';
+    html += '</button>';
+    
+    html += '<button class="quick-action-btn" onclick="sendQuickReply(\'😂\')">';
+    html += '<i class="fas fa-laugh"></i>';
+    html += '<span>Quick Laugh</span>';
+    html += '</button>';
+    
+    html += '<button class="quick-action-btn" onclick="sendQuickReply(\'🔥\')">';
+    html += '<i class="fas fa-fire"></i>';
+    html += '<span>Quick Fire</span>';
+    html += '</button>';
+    
+    html += '</div>';
+    html += '</div>';
+    showModal(html);
+}
+
+function shareLocation() {
+    if (!navigator.geolocation) {
+        showToast('Geolocation not supported', 'error');
         return;
     }
     
-    // Get the other user's ID
-    var chats = Storage.get('chats') || [];
-    var chat = chats.find(function(c) { return c.id === activeChat.id; });
-    if (!chat) return;
-    
-    if (chat.isGroup) {
-        showToast('Voice calls only available for individual chats', 'info');
-        return;
-    }
-    
-    callRecipient = chat.participants.find(function(p) { return p !== currentUser.id; });
-    if (!callRecipient) {
-        showToast('Could not find recipient', 'error');
-        return;
-    }
-    
-    isCaller = true;
-    showCallUI('Calling...');
-    
-    // Create call signal in Firebase
-    var callId = generateId();
-    if (firebaseDb) {
-        firebaseDb.ref('calls/' + callId).set({
-            caller: currentUser.id,
-            callee: callRecipient,
-            status: 'ringing',
-            timestamp: firebase.database.ServerValue.TIMESTAMP
-        });
+    navigator.geolocation.getCurrentPosition(function(position) {
+        var lat = position.coords.latitude;
+        var lng = position.coords.longitude;
+        var mapUrl = 'https://www.google.com/maps?q=' + lat + ',' + lng;
         
-        // Listen for call acceptance
-        firebaseDb.ref('calls/' + callId + '/status').on('value', function(snap) {
-            if (snap.val() === 'accepted') {
-                startCall();
-            } else if (snap.val() === 'rejected') {
-                endVoiceCall();
-                showToast('Call declined', 'info');
-            }
-        });
-    } else {
-        // Demo mode - simulate call
-        setTimeout(function() {
-            startCall();
-        }, 1000);
-    }
-}
-
-function startCall() {
-    isInCall = true;
-    
-    // Get microphone access
-    navigator.mediaDevices.getUserMedia({ audio: true, video: false })
-        .then(function(stream) {
-            localStream = stream;
-            
-            // Create peer connection
-            peerConnection = new RTCPeerConnection(iceServers);
-            
-            // Add local stream
-            localStream.getTracks().forEach(function(track) {
-                peerConnection.addTrack(track, localStream);
-            });
-            
-            // Handle remote stream
-            peerConnection.ontrack = function(event) {
-                var remoteAudio = document.getElementById('remote-audio');
-                if (remoteAudio) {
-                    remoteAudio.srcObject = event.streams[0];
-                }
-            };
-            
-            // Update UI
-            updateCallUI('Connected');
-            startCallTimer();
-            
-            // Play connected sound
-            playConnectedSound();
-        })
-        .catch(function(err) {
-            console.error('Microphone error:', err);
-            showToast('Could not access microphone', 'error');
-            endVoiceCall();
-        });
-}
-
-function endVoiceCall() {
-    isInCall = false;
-    isCaller = false;
-    
-    // Stop timer
-    if (callTimer) {
-        clearInterval(callTimer);
-        callTimer = null;
-    }
-    
-    // Close peer connection
-    if (peerConnection) {
-        peerConnection.close();
-        peerConnection = null;
-    }
-    
-    // Stop local stream
-    if (localStream) {
-        localStream.getTracks().forEach(function(track) { track.stop(); });
-        localStream = null;
-    }
-    
-    // Update Firebase
-    if (firebaseDb && callRecipient) {
-        firebaseDb.ref('calls').orderByChild('caller').equalTo(currentUser.id).once('value', function(snap) {
-            snap.forEach(function(child) {
-                child.ref.update({ status: 'ended' });
-            });
-        });
-    }
-    
-    // Hide call UI
-    hideCallUI();
-    callRecipient = null;
-    callSeconds = 0;
-}
-
-function showCallUI(status) {
-    var html = '<div class="voice-call-overlay" id="voice-call-overlay">';
-    html += '<div class="voice-call-content">';
-    html += '<div class="call-avatar"><i class="fas fa-user"></i></div>';
-    html += '<h3 id="call-user-name">' + (document.getElementById('chat-user-name').textContent || 'User') + '</h3>';
-    html += '<p id="call-status">' + status + '</p>';
-    html += '<p id="call-timer" style="display:none;">00:00</p>';
-    html += '<audio id="remote-audio" autoplay></audio>';
-    html += '<div class="call-actions">';
-    html += '<button class="call-btn call-end" onclick="endVoiceCall()"><i class="fas fa-phone-slash"></i></button>';
-    html += '<button class="call-btn call-mute" id="mute-btn" onclick="toggleMute()"><i class="fas fa-microphone"></i></button>';
-    html += '<button class="call-btn call-speaker" id="speaker-btn" onclick="toggleSpeaker()"><i class="fas fa-volume-up"></i></button>';
-    html += '</div></div></div>';
-    
-    var overlay = document.createElement('div');
-    overlay.id = 'voice-call-overlay';
-    overlay.innerHTML = html;
-    document.body.appendChild(overlay);
-}
-
-function updateCallUI(status) {
-    var statusEl = document.getElementById('call-status');
-    var timerEl = document.getElementById('call-timer');
-    if (statusEl) statusEl.textContent = status;
-    if (timerEl && status === 'Connected') timerEl.style.display = 'block';
-}
-
-function hideCallUI() {
-    var overlay = document.getElementById('voice-call-overlay');
-    if (overlay) overlay.remove();
-}
-
-function startCallTimer() {
-    callSeconds = 0;
-    callTimer = setInterval(function() {
-        callSeconds++;
-        var mins = Math.floor(callSeconds / 60).toString().padStart(2, '0');
-        var secs = (callSeconds % 60).toString().padStart(2, '0');
-        var timerEl = document.getElementById('call-timer');
-        if (timerEl) timerEl.textContent = mins + ':' + secs;
-    }, 1000);
-}
-
-function toggleMute() {
-    if (!localStream) return;
-    var audioTrack = localStream.getAudioTracks()[0];
-    if (audioTrack) {
-        audioTrack.enabled = !audioTrack.enabled;
-        var btn = document.getElementById('mute-btn');
-        if (btn) {
-            btn.innerHTML = audioTrack.enabled ? '<i class="fas fa-microphone"></i>' : '<i class="fas fa-microphone-slash"></i>';
-            btn.classList.toggle('muted', !audioTrack.enabled);
+        var messages = Storage.get('messages') || [];
+        var newMessage = {
+            id: generateId(),
+            chatId: activeChat.id,
+            senderId: currentUser.id,
+            senderName: currentUser.name,
+            text: '📍 Shared location: ' + mapUrl,
+            location: { lat: lat, lng: lng },
+            timestamp: new Date().toISOString(),
+            read: false,
+            status: 'sent',
+            reactions: {},
+            edited: false,
+            starred: false,
+            replyTo: null,
+            forwarded: false
+        };
+        
+        messages.push(newMessage);
+        Storage.set('messages', messages);
+        
+        if (typeof sendMsgToFirebase === 'function') {
+            sendMsgToFirebase(newMessage);
         }
-    }
+        
+        closeModal();
+        renderMessages(activeChat.id);
+        loadChats();
+        showToast('Location shared!', 'success');
+    }, function(err) {
+        showToast('Could not get location', 'error');
+    });
 }
 
-function toggleSpeaker() {
-    var remoteAudio = document.getElementById('remote-audio');
-    if (remoteAudio) {
-        remoteAudio.muted = !remoteAudio.muted;
-        var btn = document.getElementById('speaker-btn');
+function sendQuickReply(emoji) {
+    if (!activeChat) return;
+    
+    var messages = Storage.get('messages') || [];
+    var newMessage = {
+        id: generateId(),
+        chatId: activeChat.id,
+        senderId: currentUser.id,
+        senderName: currentUser.name,
+        text: emoji,
+        isEmoji: true,
+        timestamp: new Date().toISOString(),
+        read: false,
+        status: 'sent',
+        reactions: {},
+        edited: false,
+        starred: false,
+        replyTo: null,
+        forwarded: false
+    };
+    
+    messages.push(newMessage);
+    Storage.set('messages', messages);
+    
+    if (typeof sendMsgToFirebase === 'function') {
+        sendMsgToFirebase(newMessage);
+    }
+    
+    closeModal();
+    renderMessages(activeChat.id);
+    loadChats();
+}
         if (btn) {
             btn.innerHTML = remoteAudio.muted ? '<i class="fas fa-volume-mute"></i>' : '<i class="fas fa-volume-up"></i>';
         }
@@ -3854,8 +3768,8 @@ document.addEventListener('DOMContentLoaded', function() {
     // Starred Messages
     document.getElementById('starred-messages-btn').onclick = showStarredMessages;
     
-    // Voice Call
-    document.getElementById('voice-call-btn').onclick = startVoiceCall;
+    // Quick Actions
+    document.getElementById('quick-actions-btn').onclick = showQuickActions;
     
     // Chat Options
     document.getElementById('chat-options-btn').onclick = showChatOptions;
