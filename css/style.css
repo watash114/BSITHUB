@@ -1940,6 +1940,8 @@ body {
 
 .users-table-container {
     overflow-x: auto;
+    border-radius: 10px;
+    border: 1px solid var(--border);
 }
 
 .users-table {
@@ -1957,12 +1959,21 @@ body {
 .users-table th {
     font-weight: 600;
     color: var(--text-secondary);
-    font-size: 13px;
+    font-size: 12px;
     text-transform: uppercase;
+    background: var(--bg-secondary);
 }
 
 .users-table td {
     font-size: 14px;
+}
+
+.users-table tr:hover {
+    background: var(--bg-secondary);
+}
+
+.users-table tr:last-child td {
+    border-bottom: none;
 }
 
 .user-cell {
@@ -1971,20 +1982,228 @@ body {
     gap: 12px;
 }
 
-.user-cell-avatar-wrapper {
-    position: relative;
+.table-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    object-fit: cover;
 }
 
-.user-cell-avatar {
+.table-avatar-placeholder {
     width: 36px;
     height: 36px;
     border-radius: 50%;
     background: var(--primary);
+    color: white;
     display: flex;
     align-items: center;
     justify-content: center;
-    color: white;
+    font-weight: 600;
     font-size: 14px;
+}
+
+.user-info-cell {
+    display: flex;
+    flex-direction: column;
+}
+
+.user-info-cell strong {
+    font-size: 14px;
+}
+
+.user-info-cell small {
+    color: var(--text-secondary);
+    font-size: 12px;
+}
+
+.status-badge {
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 500;
+    text-transform: capitalize;
+}
+
+.status-badge.active {
+    background: rgba(76, 175, 80, 0.15);
+    color: #4CAF50;
+}
+
+.status-badge.banned {
+    background: rgba(255, 77, 77, 0.15);
+    color: #ff4d4d;
+}
+
+.action-buttons {
+    display: flex;
+    gap: 5px;
+}
+
+.btn-warning {
+    background: #ff9800;
+    color: white;
+}
+
+.btn-success {
+    background: #4CAF50;
+    color: white;
+}
+
+.you-label {
+    background: var(--primary);
+    color: white;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+}
+
+/* User Details Modal */
+.user-details-modal {
+    text-align: center;
+}
+
+.user-details-header {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.user-details-avatar {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    background: var(--primary);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 32px;
+    font-weight: 600;
+    margin-bottom: 10px;
+    overflow: hidden;
+}
+
+.user-details-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.user-details-info h3 {
+    margin-bottom: 5px;
+}
+
+.user-details-info p {
+    color: var(--text-secondary);
+}
+
+.user-details-stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.stat-item {
+    background: var(--bg-secondary);
+    padding: 12px;
+    border-radius: 10px;
+    text-align: center;
+}
+
+.stat-value {
+    display: block;
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--primary);
+}
+
+.stat-label {
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.user-details-info-list {
+    text-align: left;
+    margin-bottom: 15px;
+}
+
+.info-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+}
+
+.info-row:last-child {
+    border-bottom: none;
+}
+
+.info-row span:first-child {
+    color: var(--text-secondary);
+}
+
+.user-details-bio {
+    text-align: left;
+    background: var(--bg-secondary);
+    padding: 12px;
+    border-radius: 8px;
+    margin-bottom: 15px;
+}
+
+.user-details-bio p {
+    margin-top: 5px;
+    color: var(--text-secondary);
+}
+
+/* Recent Activity */
+.activity-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px;
+    border-bottom: 1px solid var(--border);
+}
+
+.activity-item:last-child {
+    border-bottom: none;
+}
+
+.activity-item i {
+    color: var(--primary);
+    width: 20px;
+}
+
+.activity-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.activity-info strong {
+    font-size: 14px;
+}
+
+.activity-info span {
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.activity-item small {
+    color: var(--text-secondary);
+    font-size: 11px;
+}
+
+/* Delete User Confirm */
+.delete-user-confirm {
+    text-align: center;
+}
+
+.delete-user-confirm p {
+    margin: 15px 0;
+    color: var(--text-secondary);
+}
     overflow: hidden;
 }
 

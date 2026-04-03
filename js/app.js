@@ -1683,37 +1683,102 @@ function loadAdminData() {
     if (!currentUser || currentUser.role !== 'admin') return;
     var users = Storage.get('users') || [];
     var messages = Storage.get('messages') || [];
+    var chats = Storage.get('chats') || [];
     
-    document.getElementById('total-users').textContent = users.length;
-    document.getElementById('total-messages').textContent = messages.length;
-    document.getElementById('active-users').textContent = users.filter(function(u) { return u.status === 'active'; }).length;
-    document.getElementById('banned-users').textContent = users.filter(function(u) { return u.status === 'banned'; }).length;
+    // Update stats with animation
+    animateCounter('total-users', users.length);
+    animateCounter('total-messages', messages.length);
+    animateCounter('active-users', users.filter(function(u) { return (u.status || 'active') === 'active'; }).length);
+    animateCounter('banned-users', users.filter(function(u) { return u.status === 'banned'; }).length);
+    animateCounter('total-chats', chats.length);
+    animateCounter('total-groups', chats.filter(function(c) { return c.isGroup; }).length);
     
     renderAdminUsersTable(users);
-    
-    // Load system logs
-    var logs = Storage.get('logs') || [];
-    var logsContainer = document.getElementById('system-logs');
-    if (logs.length === 0) {
-        logsContainer.innerHTML = '<div class="empty-state"><p>No system logs</p></div>';
-    } else {
-        logsContainer.innerHTML = logs.slice(0, 20).map(function(log) {
-            var icon = log.type === 'error' ? 'fa-exclamation-circle' : log.type === 'warning' ? 'fa-exclamation-triangle' : 'fa-info-circle';
-            var color = log.type === 'error' ? '#ff4d4d' : log.type === 'warning' ? '#ffd54d' : '#4CAF50';
-            return '<div class="log-item"><i class="fas ' + icon + '" style="color:' + color + '"></i><span>' + log.message + '</span><small>' + formatDate(log.timestamp) + '</small></div>';
-        }).join('');
-    }
+    renderRecentActivity();
+}
+
+function animateCounter(elementId, target) {
+    var el = document.getElementById(elementId);
+    if (!el) return;
+    var current = parseInt(el.textContent) || 0;
+    var increment = Math.ceil((target - current) / 20);
+    var timer = setInterval(function() {
+        current += increment;
+        if ((increment > 0 && current >= target) || (increment < 0 && current <= target)) {
+            current = target;
+            clearInterval(timer);
+        }
+        el.textContent = current;
+    }, 30);
 }
 
 function renderAdminUsersTable(users) {
     var tbody = document.getElementById('users-table-body');
+    if (!tbody) return;
+    
     tbody.innerHTML = users.map(function(user) {
+        var status = user.status || 'active';
+        var role = user.role || 'user';
+        var avatar = user.avatar ? '<img src="' + user.avatar + '" class="table-avatar">' : '<div class="table-avatar-placeholder">' + (user.name || '?').charAt(0).toUpperCase() + '</div>';
+        
         var actions = '';
         if (user.id !== currentUser.id) {
-            actions = '<button class="btn btn-small" onclick="toggleUserBan(\'' + user.id + '\')">' + (user.status === 'banned' ? 'Unban' : 'Ban') + '</button>';
+            actions = '<div class="action-buttons">';
+            actions += '<button class="btn btn-small ' + (status === 'banned' ? 'btn-success' : 'btn-warning') + '" onclick="toggleUserBan(\'' + user.id + '\')" title="' + (status === 'banned' ? 'Unban' : 'Ban') + '">';
+            actions += '<i class="fas fa-' + (status === 'banned' ? 'unlock' : 'ban') + '"></i>';
+            actions += '</button>';
+            actions += '<button class="btn btn-small btn-danger" onclick="deleteUser(\'' + user.id + '\')" title="Delete">';
+            actions += '<i class="fas fa-trash"></i>';
+            actions += '</button>';
+            actions += '<button class="btn btn-small" onclick="viewUserDetails(\'' + user.id + '\')" title="View Details">';
+            actions += '<i class="fas fa-eye"></i>';
+            actions += '</button>';
+            actions += '</div>';
+        } else {
+            actions = '<span class="you-label">You</span>';
         }
-        return '<tr><td>' + user.name + '</td><td>' + user.email + '</td><td><span class="role-badge ' + user.role + '">' + user.role + '</span></td><td>' + user.status + '</td><td>' + formatDate(user.createdAt) + '</td><td>' + actions + '</td></tr>';
+        
+        return '<tr class="user-row" data-user-id="' + user.id + '">' +
+            '<td><div class="user-cell">' + avatar + '<div class="user-info-cell"><strong>' + escapeHtml(user.name || 'Unknown') + '</strong><small>@' + escapeHtml(user.username || 'unknown') + '</small></div></div></td>' +
+            '<td>' + escapeHtml(user.email || 'N/A') + '</td>' +
+            '<td><span class="role-badge ' + role + '">' + role + '</span></td>' +
+            '<td><span class="status-badge ' + status + '">' + status + '</span></td>' +
+            '<td>' + formatDate(user.createdAt) + '</td>' +
+            '<td>' + actions + '</td>' +
+            '</tr>';
     }).join('');
+}
+
+function renderRecentActivity() {
+    var container = document.getElementById('recent-activity');
+    if (!container) return;
+    
+    var messages = Storage.get('messages') || [];
+    var users = Storage.get('users') || [];
+    
+    // Get last 10 messages
+    var recentMessages = messages.slice(-10).reverse();
+    
+    if (recentMessages.length === 0) {
+        container.innerHTML = '<div class="empty-state"><p>No recent activity</p></div>';
+        return;
+    }
+    
+    var html = '';
+    recentMessages.forEach(function(msg) {
+        var sender = users.find(function(u) { return u.id === msg.senderId; });
+        var senderName = sender ? sender.name : 'Unknown';
+        html += '<div class="activity-item">';
+        html += '<i class="fas fa-comment"></i>';
+        html += '<div class="activity-info">';
+        html += '<strong>' + escapeHtml(senderName) + '</strong>';
+        html += '<span>' + escapeHtml(msg.text.substring(0, 50)) + (msg.text.length > 50 ? '...' : '') + '</span>';
+        html += '</div>';
+        html += '<small>' + formatTime(msg.timestamp) + '</small>';
+        html += '</div>';
+    });
+    
+    container.innerHTML = html;
 }
 
 function toggleUserBan(userId) {
@@ -1722,10 +1787,84 @@ function toggleUserBan(userId) {
     if (user) {
         user.status = user.status === 'banned' ? 'active' : 'banned';
         Storage.set('users', users);
-        addLog('warning', (user.status === 'banned' ? 'Banned' : 'Unbanned') + ' user: ' + user.username);
+        addLog('warning', (user.status === 'banned' ? 'Banned' : 'Unbanned') + ' user: ' + (user.username || user.name));
         loadAdminData();
         showToast('User ' + (user.status === 'banned' ? 'banned' : 'unbanned'), 'success');
     }
+}
+
+function deleteUser(userId) {
+    showModal('<div class="delete-user-confirm"><h3>Delete User?</h3><p>This will permanently delete the user and all their messages.</p><div class="modal-buttons"><button class="btn" onclick="closeModal()">Cancel</button><button class="btn btn-danger" onclick="confirmDeleteUser(\'' + userId + '\')">Delete</button></div></div>');
+}
+
+function confirmDeleteUser(userId) {
+    var users = Storage.get('users') || [];
+    var user = users.find(function(u) { return u.id === userId; });
+    
+    // Remove user
+    users = users.filter(function(u) { return u.id !== userId; });
+    Storage.set('users', users);
+    
+    // Remove user's messages
+    var messages = Storage.get('messages') || [];
+    messages = messages.filter(function(m) { return m.senderId !== userId; });
+    Storage.set('messages', messages);
+    
+    // Remove user from chats
+    var chats = Storage.get('chats') || [];
+    chats.forEach(function(chat) {
+        chat.participants = chat.participants.filter(function(p) { return p !== userId; });
+    });
+    chats = chats.filter(function(c) { return c.participants.length > 0; });
+    Storage.set('chats', chats);
+    
+    addLog('error', 'Deleted user: ' + (user ? user.username : userId));
+    closeModal();
+    loadAdminData();
+    showToast('User deleted', 'success');
+}
+
+function viewUserDetails(userId) {
+    var users = Storage.get('users') || [];
+    var user = users.find(function(u) { return u.id === userId; });
+    if (!user) return;
+    
+    var messages = Storage.get('messages') || [];
+    var userMessages = messages.filter(function(m) { return m.senderId === userId; });
+    var chats = Storage.get('chats') || [];
+    var userChats = chats.filter(function(c) { return c.participants.indexOf(userId) !== -1; });
+    
+    var avatar = user.avatar ? '<img src="' + user.avatar + '">' : (user.name || '?').charAt(0).toUpperCase();
+    
+    var html = '<div class="user-details-modal">';
+    html += '<div class="user-details-header">';
+    html += '<div class="user-details-avatar">' + avatar + '</div>';
+    html += '<div class="user-details-info">';
+    html += '<h3>' + escapeHtml(user.name || 'Unknown') + '</h3>';
+    html += '<p>@' + escapeHtml(user.username || 'unknown') + '</p>';
+    html += '</div></div>';
+    
+    html += '<div class="user-details-stats">';
+    html += '<div class="stat-item"><span class="stat-value">' + userMessages.length + '</span><span class="stat-label">Messages</span></div>';
+    html += '<div class="stat-item"><span class="stat-value">' + userChats.length + '</span><span class="stat-label">Chats</span></div>';
+    html += '<div class="stat-item"><span class="stat-value">' + (user.role || 'user') + '</span><span class="stat-label">Role</span></div>';
+    html += '<div class="stat-item"><span class="stat-value">' + (user.status || 'active') + '</span><span class="stat-label">Status</span></div>';
+    html += '</div>';
+    
+    html += '<div class="user-details-info-list">';
+    html += '<div class="info-row"><span>Email:</span><span>' + escapeHtml(user.email || 'N/A') + '</span></div>';
+    html += '<div class="info-row"><span>Phone:</span><span>' + escapeHtml(user.phone || 'N/A') + '</span></div>';
+    html += '<div class="info-row"><span>Location:</span><span>' + escapeHtml(user.location || 'N/A') + '</span></div>';
+    html += '<div class="info-row"><span>Joined:</span><span>' + formatDate(user.createdAt) + '</span></div>';
+    html += '</div>';
+    
+    if (user.bio) {
+        html += '<div class="user-details-bio"><strong>Bio:</strong><p>' + escapeHtml(user.bio) + '</p></div>';
+    }
+    
+    html += '<button class="btn" onclick="closeModal()">Close</button>';
+    html += '</div>';
+    showModal(html);
 }
 
 function searchAdminUsers(query) {
