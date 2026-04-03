@@ -2669,11 +2669,26 @@ function archiveChat() {
 
 function clearChatHistory() {
     if (!activeChat) return;
+    
+    // Clear from localStorage
     var messages = Storage.get('messages') || [];
     messages = messages.filter(function(m) { return m.chatId !== activeChat.id; });
     Storage.set('messages', messages);
+    
+    // Clear from Firebase
+    if (firebaseDb) {
+        firebaseDb.ref('messages/' + activeChat.id).remove()
+            .then(function() {
+                console.log('Messages deleted from Firebase');
+            })
+            .catch(function(err) {
+                console.error('Error deleting from Firebase:', err);
+            });
+    }
+    
     closeModal();
-    loadChatMessages(activeChat.id);
+    renderMessages(activeChat.id);
+    loadChats();
     showToast('Chat history cleared', 'success');
 }
 
