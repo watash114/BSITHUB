@@ -395,6 +395,100 @@ function socialLogin(provider) {
         return;
     }
     
+    // Check if Auth is available
+    if (!firebase.auth) {
+        showToast('Firebase Auth not loaded. Please refresh.', 'error');
+        return;
+    }
+    
+    var auth = firebase.auth();
+    var providerObj;
+    
+    switch(provider) {
+        case 'google':
+            providerObj = new firebase.auth.GoogleAuthProvider();
+            break;
+        case 'facebook':
+            providerObj = new firebase.auth.FacebookAuthProvider();
+            break;
+        case 'github':
+            providerObj = new firebase.auth.GithubAuthProvider();
+            break;
+        default:
+            showToast('Unknown provider', 'error');
+            return;
+    }
+    
+    auth.signInWithPopup(providerObj)
+        .then(function(result) {
+            var user = result.user;
+            console.log('Social login success:', user.displayName);
+            
+            // Check if user exists in our system
+            var users = Storage.get('users') || [];
+            var existingUser = users.find(function(u) { return u.email === user.email; });
+            
+            if (existingUser) {
+                // User exists - log them in
+                currentUser = existingUser;
+                Storage.set('currentUser', { id: existingUser.id });
+                showToast('Welcome back, ' + user.displayName + '!', 'success');
+                showApp();
+            } else {
+                // Create new user from social login
+                var newUser = {
+                    id: generateId(),
+                    name: user.displayName || 'User',
+                    username: user.email.split('@')[0],
+                    email: user.email,
+                    password: null,
+                    role: 'user',
+                    status: 'active',
+                    bio: '',
+                    phone: user.phoneNumber || '',
+                    location: '',
+                    createdAt: new Date().toISOString(),
+                    avatar: user.photoURL,
+                    blockedUsers: [],
+                    socialProvider: provider
+                };
+                
+                users.push(newUser);
+                Storage.set('users', users);
+                currentUser = newUser;
+                Storage.set('currentUser', { id: newUser.id });
+                
+                if (typeof syncUserToFirebase === 'function') {
+                    syncUserToFirebase(newUser);
+                }
+                
+                showToast('Welcome to BSITHUB, ' + user.displayName + '!', 'success');
+                showApp();
+            }
+        })
+        .catch(function(error) {
+            console.error('Social login error:', error);
+            
+            if (error.code === 'auth/popup-closed-by-user') {
+                showToast('Login cancelled', 'info');
+            } else if (error.code === 'auth/configuration-not-found') {
+                // Show setup instructions
+                showModal('<div class="setup-instructions"><h3>Setup Required</h3><p>To enable social login, you need to:</p><ol><li>Go to <a href="https://console.firebase.google.com/project/bsithub-1974a/authentication/providers" target="_blank">Firebase Console</a></li><li>Click "Authentication" → "Sign-in method"</li><li>Enable "Google" provider</li><li>Click Save</li></ol><p><strong>That\'s it!</strong> Then try again.</p><button class="btn btn-primary" onclick="closeModal()">Got it</button></div>');
+            } else if (error.code === 'auth/account-exists-with-different-credential') {
+                showToast('Account already exists with different login method', 'error');
+            } else if (error.code === 'auth/unauthorized-domain') {
+                showToast('This domain is not authorized. Add it in Firebase Console → Authentication → Settings → Authorized domains', 'error');
+            } else {
+                showToast('Login failed: ' + error.message, 'error');
+            }
+        });
+}
+    
+    if (typeof firebase === 'undefined' || !firebase.apps.length) {
+        showToast('Firebase not ready. Please refresh.', 'error');
+        return;
+    }
+    
     var auth = firebase.auth();
     var providerObj;
     
