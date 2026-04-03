@@ -203,6 +203,12 @@ body {
     background: #dc2626;
 }
 
+.btn-small {
+    padding: 6px 12px;
+    font-size: 12px;
+    border-radius: var(--radius-sm);
+}
+
 .btn-icon {
     width: 40px;
     height: 40px;
@@ -345,6 +351,12 @@ body {
 .password-strength-bar {
     height: 100%;
     transition: var(--transition);
+}
+
+.password-strength-label {
+    font-size: 11px;
+    margin-top: 4px;
+    display: block;
 }
 
 /* Auth Page */
@@ -2825,14 +2837,56 @@ body {
     border-radius: 8px;
 }
 
-/* Voice Message */
-.voice-message {
-    text-align: center;
+/* Video Player */
+.message-video {
+    max-width: 300px;
+    margin: 5px 0;
 }
 
-.voice-message button {
-    font-size: 18px;
-    padding: 15px 30px;
+.message-video video {
+    width: 100%;
+    border-radius: 8px;
+    max-height: 200px;
+}
+
+/* File Display */
+.message-file {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: 8px;
+    margin: 5px 0;
+}
+
+.message.received .message-file {
+    background: rgba(0, 0, 0, 0.1);
+}
+
+.message.sent .message-file {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.message-file a {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: inherit;
+    text-decoration: none;
+}
+
+.message-file i {
+    font-size: 20px;
+    opacity: 0.8;
+}
+
+.file-name {
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 13px;
 }
 
 /* Groups Container */
@@ -2850,6 +2904,9 @@ body {
     text-align: center;
     cursor: pointer;
     transition: transform 0.2s, box-shadow 0.2s;
+    pointer-events: auto;
+    position: relative;
+    z-index: 1;
 }
 
 .group-card:hover {
@@ -2930,7 +2987,11 @@ body {
 }
 
 .message-status {
-    color: var(--primary);
+    color: var(--text-secondary);
+}
+
+.message-status.read {
+    color: #53bdeb;
 }
 
 /* Reactions */
@@ -3003,6 +3064,124 @@ body {
 .reaction-option:hover {
     transform: scale(1.3);
     background: var(--bg-secondary);
+}
+
+/* Message Reply Preview */
+.message-reply-preview {
+    background: rgba(0, 0, 0, 0.1);
+    border-left: 3px solid var(--primary);
+    padding: 5px 10px;
+    margin-bottom: 5px;
+    border-radius: 4px;
+    font-size: 12px;
+}
+
+.reply-sender {
+    font-weight: 600;
+    color: var(--primary);
+    margin-right: 5px;
+}
+
+.reply-text {
+    color: var(--text-secondary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Message Actions */
+.message-actions {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    gap: 5px;
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+.message.sent .message-actions {
+    left: -70px;
+}
+
+.message.received .message-actions {
+    right: -70px;
+}
+
+.message:hover .message-actions {
+    opacity: 1;
+}
+
+.message-action-btn {
+    background: var(--bg-secondary);
+    border: none;
+    border-radius: 50%;
+    width: 28px;
+    height: 28px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    color: var(--text-secondary);
+    transition: background 0.2s, color 0.2s;
+}
+
+.message-action-btn:hover {
+    background: var(--primary);
+    color: white;
+}
+
+/* Mentions Dropdown */
+.mentions-dropdown {
+    position: absolute;
+    bottom: 100%;
+    left: 0;
+    right: 0;
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-lg);
+    max-height: 200px;
+    overflow-y: auto;
+    z-index: 100;
+    display: none;
+}
+
+.mention-item {
+    padding: 10px 15px;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--border);
+}
+
+.mention-item:last-child {
+    border-bottom: none;
+}
+
+.mention-item:hover {
+    background: var(--bg-secondary);
+}
+
+.mention-name {
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.mention-username {
+    color: var(--text-secondary);
+    font-size: 13px;
+}
+
+/* GIF Loading & No Results */
+.gif-loading,
+.gif-no-results {
+    padding: 20px;
+    text-align: center;
+    color: var(--text-secondary);
+    grid-column: 1 / -1;
 }
 
 /* Typing Indicator */

@@ -40,14 +40,34 @@ function initRealtime() {
         if (e.key === 'onlineUsers') {
             updateOnlineStatus();
         }
+        if (e.key === 'chats') {
+            loadChats();
+        }
     });
     
-    // Also poll for updates every 2 seconds (backup)
+    // Poll for updates every 2 seconds (backup)
     realtimeInterval = setInterval(function() {
         handleNewMessages();
         handleTypingIndicator();
         updateOnlineStatus();
     }, 2000);
+    
+    // Listen for chats from Firebase (groups created by other users)
+    if (typeof listenForChats === 'function' && currentUser) {
+        listenForChats(function() {
+            loadChats();
+            loadGroups();
+        });
+    }
+    
+    // Periodically fetch messages from Firebase for all chats (backup sync)
+    if (currentUser) {
+        setInterval(function() {
+            if (typeof fetchAllMessagesFromFirebase === 'function') {
+                fetchAllMessagesFromFirebase();
+            }
+        }, 5000);
+    }
 }
 
 function handleNewMessages() {
@@ -94,8 +114,8 @@ function sendTypingIndicator() {
     if (!currentUser || !activeChat) return;
     
     // Send via Firebase for cross-browser/device
-    if (typeof sendTypingIndicatorFirebase === 'function') {
-        sendTypingIndicatorFirebase(activeChat.id, currentUser.id);
+    if (typeof sendTypingStatus === 'function') {
+        sendTypingStatus(activeChat.id, currentUser.id, true);
     }
     
     // Also set in localStorage for same-browser
@@ -210,6 +230,32 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
+function getFileIcon(fileName) {
+    var ext = fileName.split('.').pop().toLowerCase();
+    var icons = {
+        'pdf': 'fa-file-pdf',
+        'doc': 'fa-file-word',
+        'docx': 'fa-file-word',
+        'xls': 'fa-file-excel',
+        'xlsx': 'fa-file-excel',
+        'ppt': 'fa-file-powerpoint',
+        'pptx': 'fa-file-powerpoint',
+        'zip': 'fa-file-archive',
+        'rar': 'fa-file-archive',
+        'txt': 'fa-file-alt',
+        'jpg': 'fa-file-image',
+        'jpeg': 'fa-file-image',
+        'png': 'fa-file-image',
+        'gif': 'fa-file-image',
+        'mp3': 'fa-file-audio',
+        'wav': 'fa-file-audio',
+        'mp4': 'fa-file-video',
+        'avi': 'fa-file-video',
+        'mov': 'fa-file-video'
+    };
+    return icons[ext] || 'fa-file';
+}
+
 // ==========================================
 // Toast Notifications
 // ==========================================
@@ -285,6 +331,7 @@ function initializeDefaultData() {
 let currentUser = null;
 let activeChat = null;
 let pinnedChatsView = false;
+let currentReplyTo = null;
 
 // ==========================================
 // Authentication
@@ -361,11 +408,135 @@ function showApp() {
     console.log('showApp called, currentUser:', currentUser);
     document.getElementById('auth-page').classList.remove('active');
     document.getElementById('app-page').classList.add('active');
+    
+    // Initialize Firebase
+    initFirebase();
+    
     initializeApp();
     
-    // Set user online in Firebase
-    if (currentUser && typeof setUserOnlineFirebase === 'function') {
-        setUserOnlineFirebase(currentUser.id);
+    // Set user online
+    if (currentUser && typeof goOnline === 'function') {
+        goOnline(currentUser.id);
+    }
+    
+    // Load chats from Firebase
+    if (currentUser && typeof getUserChats === 'function') {
+        getUserChats(currentUser.id).then(function(chatIds) {
+            console.log('User has', chatIds.length, 'chats from Firebase');
+            // We'll handle this when user opens the chats section
+        });
+    }
+    
+    // Listen for new chats from other users
+    if (currentUser && typeof listenNewChats === 'function') {
+        listenNewChats(currentUser.id, function(chat) {
+            console.log('New chat received:', chat.id);
+            var chats = Storage.get('chats') || [];
+            var exists = chats.find(function(c) { return c.id === chat.id; });
+            if (!exists) {
+                chats.push(chat);
+                Storage.set('chats', chats);
+                loadChats();
+                loadGroups();
+                showToast('New chat: ' + (chat.groupName || 'Chat'), 'info');
+            }
+        });
+    }
+    
+    // Sync current user info to Firebase
+    if (currentUser && typeof syncUserToFirebase === 'function') {
+        syncUserToFirebase(currentUser);
+    }
+    
+    // Load chats from Firebase and listen for new chats
+    if (currentUser && typeof loadUserChatsFromFirebase === 'function') {
+        loadUserChatsFromFirebase(currentUser.id).then(function(fbChats) {
+            if (fbChats && fbChats.length > 0) {
+                var localChats = Storage.get('chats') || [];
+                
+                fbChats.forEach(function(fbChat) {
+                    var existingIndex = localChats.findIndex(function(c) { return c.id === fbChat.id; });
+                    if (existingIndex === -1) {
+                        localChats.push(fbChat);
+                    }
+                });
+                
+                Storage.set('chats', localChats);
+                loadChats();
+                loadGroups();
+            }
+        });
+        
+        // Listen for new chats from other users
+        if (typeof listenNewChats === 'function') {
+            listenNewChats(currentUser.id, function(chat) {
+                var localChats = Storage.get('chats') || [];
+                var existingIndex = localChats.findIndex(function(c) { return c.id === chat.id; });
+                
+                if (existingIndex === -1) {
+                    localChats.push(chat);
+                    Storage.set('chats', localChats);
+                    loadChats();
+                    loadGroups();
+                    showToast('New chat!', 'info');
+                }
+            });
+        }
+        
+        // POLLING BACKUP - fetch chats every 5 seconds
+        setInterval(function() {
+            if (typeof getUserChats === 'function') {
+                getUserChats(currentUser.id).then(function(chatIds) {
+                    // Fetch full chat data for each chat
+                    chatIds.forEach(function(chatId) {
+                        if (firebaseDb) {
+                            firebaseDb.ref('chats/' + chatId).once('value').then(function(snap) {
+                                if (snap.val()) {
+                                    var localChats = Storage.get('chats') || [];
+                                    var idx = localChats.findIndex(function(c) { return c.id === chatId; });
+                                    if (idx === -1) {
+                                        localChats.push(snap.val());
+                                        Storage.set('chats', localChats);
+                                        loadChats();
+                                        loadGroups();
+                                    }
+                                }
+                            });
+                        }
+                    });
+                });
+            }
+        }, 5000);
+    }
+    
+    // Fetch all messages and user data from Firebase
+    if (currentUser && typeof fetchAllMessagesFromFirebase === 'function') {
+        // Delay slightly to ensure Firebase is ready
+        setTimeout(function() {
+            fetchAllMessagesFromFirebase();
+            
+            // Also fetch all users from Firebase
+            if (typeof fetchUsersFromFirebase === 'function') {
+                var chats = Storage.get('chats') || [];
+                var userChats = chats.filter(function(c) { return c.participants.indexOf(currentUser.id) !== -1; });
+                var allParticipantIds = [];
+                userChats.forEach(function(chat) {
+                    chat.participants.forEach(function(pId) {
+                        if (allParticipantIds.indexOf(pId) === -1) {
+                            allParticipantIds.push(pId);
+                        }
+                    });
+                });
+                
+                fetchUsersFromFirebase(allParticipantIds, function() {
+                    loadChats();
+                    loadGroups();
+                });
+            } else {
+                loadChats();
+                loadGroups();
+            }
+        }, 1000);
     }
 }
 
@@ -393,6 +564,14 @@ function initializeApp() {
     loadProfile();
     initNavigation();
     
+    // Listen for chats from Firebase (groups created by other users)
+    if (typeof listenForChats === 'function') {
+        listenForChats(function() {
+            loadChats();
+            loadGroups();
+        });
+    }
+    
     // Admin check
     if (currentUser.role === 'admin') {
         document.querySelector('.admin-only').classList.add('visible');
@@ -404,6 +583,14 @@ function initializeApp() {
 
 function updateSidebar() {
     document.getElementById('sidebar-username').textContent = currentUser.username;
+    
+    // Update sidebar avatar
+    var sidebarAvatar = document.getElementById('sidebar-avatar');
+    if (currentUser.avatar) {
+        sidebarAvatar.innerHTML = '<img src="' + currentUser.avatar + '" alt="Avatar">';
+    } else {
+        sidebarAvatar.innerHTML = '<i class="fas fa-user"></i>';
+    }
 }
 
 // ==========================================
@@ -444,7 +631,7 @@ function loadGroups() {
     
     var html = '';
     myGroups.forEach(function(group) {
-        html += '<div class="group-card" onclick="openChat(\'' + group.id + '\', \'' + group.participants[0] + '\')">';
+        html += '<div class="group-card" data-chat-id="' + group.id + '" data-user-id="' + currentUser.id + '">';
         html += '<div class="group-avatar"><i class="fas fa-users"></i></div>';
         html += '<div class="group-name">' + (group.groupName || 'Group') + '</div>';
         html += '<div class="group-members">' + group.participants.length + ' members</div>';
@@ -452,6 +639,16 @@ function loadGroups() {
     });
     
     groupsContainer.innerHTML = html;
+    
+    // Use event delegation instead of inline onclick
+    groupsContainer.addEventListener('click', function(e) {
+        console.log('Group card clicked', e.target);
+        var card = e.target.closest('.group-card');
+        if (card) {
+            console.log('Opening chat:', card.dataset.chatId, card.dataset.userId);
+            openChat(card.dataset.chatId, card.dataset.userId);
+        }
+    });
 }
 
 // ==========================================
@@ -489,14 +686,18 @@ function loadChats() {
         if (chat.isGroup) {
             chatName = chat.groupName || 'Group';
             chatAvatar = '<i class="fas fa-users"></i>';
-            chatUserId = chat.participants[0];
+            chatUserId = chat.participants[0] || currentUser.id;
         } else {
             var otherUserId = chat.participants.find(function(p) { return p !== currentUser.id; });
             var otherUser = users.find(function(u) { return u.id === otherUserId; });
-            if (!otherUser) return;
-            chatName = otherUser.name;
-            chatAvatar = otherUser.avatar ? '<img src="' + otherUser.avatar + '">' : otherUser.name.charAt(0).toUpperCase();
-            chatUserId = otherUserId;
+            if (otherUser) {
+                chatName = otherUser.name;
+                chatAvatar = otherUser.avatar ? '<img src="' + otherUser.avatar + '">' : otherUser.name.charAt(0).toUpperCase();
+            } else {
+                chatName = 'User ' + (otherUserId ? otherUserId.substring(0, 5) : 'Unknown');
+                chatAvatar = '?';
+            }
+            chatUserId = otherUserId || currentUser.id;
         }
         
         html += '<div class="chat-item ' + (isActive ? 'active' : '') + (chat.pinned ? ' pinned' : '') + '" data-chat-id="' + chat.id + '" data-user-id="' + chatUserId + '">';
@@ -517,12 +718,86 @@ function loadChats() {
     });
 }
 
+function loadChatsWithUnread() {
+    var chatList = document.getElementById('chat-list');
+    var chats = Storage.get('chats') || [];
+    var messages = Storage.get('messages') || [];
+    var users = Storage.get('users') || [];
+    
+    var myChats = chats.filter(function(c) { return c.participants.indexOf(currentUser.id) !== -1 && !c.archived; });
+    
+    var unreadChats = myChats.filter(function(chat) {
+        var chatMessages = messages.filter(function(m) { return m.chatId === chat.id; });
+        return chatMessages.some(function(m) { return !m.read && m.senderId !== currentUser.id; });
+    });
+    
+    var html = '';
+    unreadChats.forEach(function(chat) {
+        var chatMessages = messages.filter(function(m) { return m.chatId === chat.id; });
+        var lastMessage = chatMessages[chatMessages.length - 1];
+        var unreadCount = chatMessages.filter(function(m) { return !m.read && m.senderId !== currentUser.id; }).length;
+        var isActive = activeChat && activeChat.id === chat.id;
+        
+        var chatName = '';
+        var chatAvatar = '';
+        var chatUserId = '';
+        
+        if (chat.isGroup) {
+            chatName = chat.groupName || 'Group';
+            chatAvatar = '<i class="fas fa-users"></i>';
+            chatUserId = chat.participants[0] || currentUser.id;
+        } else {
+            var otherUserId = chat.participants.find(function(p) { return p !== currentUser.id; });
+            var otherUser = users.find(function(u) { return u.id === otherUserId; });
+            if (otherUser) {
+                chatName = otherUser.name;
+                chatAvatar = otherUser.avatar ? '<img src="' + otherUser.avatar + '">' : otherUser.name.charAt(0).toUpperCase();
+            } else {
+                chatName = 'User ' + (otherUserId ? otherUserId.substring(0, 5) : 'Unknown');
+                chatAvatar = '?';
+            }
+            chatUserId = otherUserId || currentUser.id;
+        }
+        
+        html += '<div class="chat-item ' + (isActive ? 'active' : '') + (chat.pinned ? ' pinned' : '') + '" data-chat-id="' + chat.id + '" data-user-id="' + chatUserId + '">';
+        html += '<div class="chat-item-avatar-wrapper"><div class="chat-item-avatar">' + chatAvatar + '</div></div>';
+        html += '<div class="chat-item-info"><div class="chat-item-name">' + chatName + '</div>';
+        html += '<div class="chat-item-message">' + (lastMessage ? escapeHtml(lastMessage.text).substring(0, 30) : 'No messages yet') + '</div></div>';
+        html += '<div class="chat-item-meta"><div class="chat-item-time">' + (lastMessage ? formatTime(lastMessage.timestamp) : '') + '</div>';
+        if (unreadCount > 0) html += '<span class="chat-item-badge">' + unreadCount + '</span>';
+        html += '</div></div>';
+    });
+    
+    if (html === '') {
+        html = '<div class="empty-state"><i class="fas fa-bell-slash"></i><p>No unread chats</p></div>';
+    }
+    
+    chatList.innerHTML = html;
+    
+    chatList.querySelectorAll('.chat-item').forEach(function(item) {
+        item.onclick = function() {
+            openChat(item.dataset.chatId, item.dataset.userId);
+        };
+    });
+}
+
 function openChat(chatId, userId) {
+    console.log('openChat called:', chatId, userId);
     var chats = Storage.get('chats') || [];
     var chat = chats.find(function(c) { return c.id === chatId; });
-    if (!chat) return;
+    console.log('Found chat:', chat);
+    if (!chat) {
+        showToast('Chat not found', 'error');
+        return;
+    }
     
     activeChat = { id: chatId, userId: userId };
+    
+    // Switch to chats section if not already there
+    document.querySelectorAll('.nav-item').forEach(function(i) { i.classList.remove('active'); });
+    document.querySelectorAll('.content-section').forEach(function(s) { s.classList.remove('active'); });
+    document.getElementById('chats-section').classList.add('active');
+    document.getElementById('chats-nav').classList.add('active');
     
     document.getElementById('chat-placeholder').style.display = 'none';
     document.getElementById('chat-active').style.display = 'flex';
@@ -533,38 +808,121 @@ function openChat(chatId, userId) {
     } else {
         var users = Storage.get('users') || [];
         var otherUser = users.find(function(u) { return u.id === userId; });
-        if (!otherUser) return;
-        document.getElementById('chat-user-name').textContent = otherUser.name;
-        document.getElementById('chat-user-status').textContent = 'Online';
+        if (otherUser) {
+            document.getElementById('chat-user-name').textContent = otherUser.name;
+            document.getElementById('chat-user-status').textContent = 'Online';
+        } else {
+            document.getElementById('chat-user-name').textContent = 'Chat';
+            document.getElementById('chat-user-status').textContent = '';
+        }
     }
     
     // Apply wallpaper
     var wallpaper = chat.wallpaper || (Storage.get('settings') || {}).wallpaper || 'none';
     document.getElementById('chat-wallpaper').style.background = wallpaper;
     
+    // Render current messages
     renderMessages(chatId);
     
-    // Listen for messages from Firebase (cross-browser/device)
-    if (typeof listenForMessages === 'function') {
-        listenForMessages(chatId, function(fbMessages) {
+    // Load messages from Firebase and start listening
+    if (typeof loadChatMessages === 'function') {
+        loadChatMessages(chatId).then(function(fbMessages) {
+            console.log('Loaded', fbMessages.length, 'messages from Firebase');
+            
+            // Merge with local messages
+            var localMessages = Storage.get('messages') || [];
+            fbMessages.forEach(function(fbMsg) {
+                var idx = localMessages.findIndex(function(m) { return m.id === fbMsg.id; });
+                if (idx === -1) {
+                    localMessages.push(fbMsg);
+                }
+            });
+            Storage.set('messages', localMessages);
             renderMessages(chatId);
             loadChats();
         });
     }
     
-    // Listen for typing indicator
-    if (typeof listenForTypingIndicator === 'function' && currentUser) {
-        listenForTypingIndicator(chatId, currentUser.id, function(typing) {
+    // Listen for NEW messages in real-time
+    if (typeof listenChat === 'function') {
+        listenChat(chatId, function(msg) {
+            var localMessages = Storage.get('messages') || [];
+            var idx = localMessages.findIndex(function(m) { return m.id === msg.id; });
+            
+            if (idx === -1) {
+                // NEW MESSAGE!
+                localMessages.push(msg);
+                Storage.set('messages', localMessages);
+                
+                // Play sound if not our message
+                if (msg.senderId !== currentUser.id) {
+                    playReceiveSound();
+                }
+                
+                renderMessages(chatId);
+                loadChats();
+            } else {
+                // Update existing
+                localMessages[idx] = msg;
+                Storage.set('messages', localMessages);
+                renderMessages(chatId);
+            }
+        });
+    }
+    
+    // POLLING BACKUP - fetch messages every 2 seconds (in case listener fails)
+    if (window.chatPollInterval) {
+        clearInterval(window.chatPollInterval);
+    }
+    window.chatPollInterval = setInterval(function() {
+        if (activeChat && activeChat.id === chatId && typeof loadChatMessages === 'function') {
+            loadChatMessages(chatId).then(function(fbMessages) {
+                if (fbMessages && fbMessages.length > 0) {
+                    var localMessages = Storage.get('messages') || [];
+                    var changed = false;
+                    
+                    fbMessages.forEach(function(fbMsg) {
+                        var idx = localMessages.findIndex(function(m) { return m.id === fbMsg.id; });
+                        if (idx === -1) {
+                            localMessages.push(fbMsg);
+                            changed = true;
+                            // Play sound for new messages from others
+                            if (fbMsg.senderId !== currentUser.id) {
+                                playReceiveSound();
+                            }
+                        }
+                    });
+                    
+                    if (changed) {
+                        Storage.set('messages', localMessages);
+                        renderMessages(chatId);
+                        loadChats();
+                    }
+                }
+            });
+        }
+    }, 2000);
+    
+    // Listen for typing
+    if (typeof listenTyping === 'function') {
+        listenTyping(chatId, currentUser.id, function(uid) {
             var users = Storage.get('users') || [];
-            var typingUser = users.find(function(u) { return u.id === typing.userId; });
+            var typingUser = users.find(function(u) { return u.id === uid; });
             if (typingUser) {
                 document.getElementById('typing-indicator').style.display = 'flex';
                 document.getElementById('typing-indicator').querySelector('span').textContent = typingUser.name + ' is typing';
-                
                 setTimeout(function() {
                     document.getElementById('typing-indicator').style.display = 'none';
                 }, 3000);
             }
+        });
+    }
+}
+
+document.querySelectorAll('.chat-item').forEach(function(item) {
+    item.classList.remove('active');
+    if (item.dataset.chatId === chatId) item.classList.add('active');
+});
         });
     }
     
@@ -580,6 +938,7 @@ function loadChatMessages(chatId) {
 
 function renderMessages(chatId) {
     var messages = Storage.get('messages') || [];
+    var users = Storage.get('users') || [];
     var messagesContainer = document.getElementById('chat-messages');
     var chatMessages = messages.filter(function(m) { return m.chatId === chatId; });
     
@@ -606,17 +965,39 @@ function renderMessages(chatId) {
         else if (msg.fileData && msg.fileType && msg.fileType.startsWith('image/')) {
             html += '<div class="message-media"><img src="' + msg.fileData + '" alt="Image" onclick="viewImage(this.src)"></div>';
         }
+        // Check for video
+        else if (msg.fileData && msg.fileType && msg.fileType.startsWith('video/')) {
+            html += '<div class="message-video"><video controls src="' + msg.fileData + '"></video></div>';
+        }
         // Check for audio
-        else if (msg.audioData) {
-            html += '<div class="message-audio"><audio controls src="' + msg.audioData + '"></audio></div>';
+        else if (msg.fileData && msg.fileType && msg.fileType.startsWith('audio/')) {
+            html += '<div class="message-audio"><audio controls src="' + msg.fileData + '"></audio></div>';
         }
         // Check for file
         else if (msg.fileData) {
-            html += '<div class="message-file"><a href="' + msg.fileData + '" download="' + (msg.fileName || 'file') + '">' + escapeHtml(msg.text) + '</a></div>';
+            var fileIcon = getFileIcon(msg.fileName || '');
+            html += '<div class="message-file">';
+            html += '<a href="' + msg.fileData + '" download="' + (msg.fileName || 'file') + '">';
+            html += '<i class="fas ' + fileIcon + '"></i>';
+            html += '<span class="file-name">' + escapeHtml(msg.fileName || 'file') + '</span>';
+            html += '</a></div>';
         }
         // Regular text
         else {
             html += '<div class="message-text">' + escapeHtml(msg.text) + '</div>';
+        }
+        
+        // Show reply preview if this message is a reply
+        if (msg.replyTo) {
+            var replyMessage = messages.find(function(m) { return m.id === msg.replyTo; });
+            if (replyMessage) {
+                var replySender = users.find(function(u) { return u.id === replyMessage.senderId; });
+                var replySenderName = replySender ? replySender.name : 'Unknown';
+                html += '<div class="message-reply-preview">';
+                html += '<span class="reply-sender">' + replySenderName + '</span>';
+                html += '<span class="reply-text">' + escapeHtml(replyMessage.text.substring(0, 50)) + '</span>';
+                html += '</div>';
+            }
         }
         
         // Reactions
@@ -635,12 +1016,16 @@ function renderMessages(chatId) {
         html += '<div class="message-footer">';
         html += '<span class="message-time">' + formatTime(msg.timestamp) + '</span>';
         if (isSent) {
-            html += '<span class="message-status">' + (msg.status === 'read' ? '✓✓' : '✓') + '</span>';
+            var statusClass = msg.status === 'read' ? ' read' : '';
+            html += '<span class="message-status' + statusClass + '">' + (msg.status === 'read' ? '✓✓' : '✓') + '</span>';
         }
         html += '</div>';
         
-        // Reaction button
-        html += '<button class="reaction-btn" onclick="showReactionPicker(\'' + msg.id + '\')">😀</button>';
+        // Action buttons
+        html += '<div class="message-actions">';
+        html += '<button class="message-action-btn" onclick="startReply(\'' + msg.id + '\')" title="Reply"><i class="fas fa-reply"></i></button>';
+        html += '<button class="message-action-btn" onclick="showReactionPicker(\'' + msg.id + '\')" title="React">😀</button>';
+        html += '</div>';
         html += '</div>';
         html += '</div>';
     });
@@ -699,7 +1084,95 @@ function sendMessage(text) {
         id: generateId(),
         chatId: activeChat.id,
         senderId: currentUser.id,
+        senderName: currentUser.name,
         text: text.trim(),
+        timestamp: new Date().toISOString(),
+        read: false,
+        status: 'sent',
+        reactions: {},
+        edited: false,
+        starred: false,
+        replyTo: currentReplyTo,
+        forwarded: false
+    };
+    
+    // Save to local storage FIRST
+    messages.push(newMessage);
+    Storage.set('messages', messages);
+    
+    // Clear reply preview
+    clearReplyPreview();
+    
+    // Update UI immediately
+    renderMessages(activeChat.id);
+    loadChats();
+    
+    // Send to Firebase (async)
+    if (typeof sendMsgToFirebase === 'function') {
+        sendMsgToFirebase(newMessage)
+            .then(function() {
+                console.log('Message sent to Firebase!');
+                newMessage.status = 'delivered';
+                Storage.set('messages', messages);
+                renderMessages(activeChat.id);
+            })
+            .catch(function(err) {
+                console.error('Failed to send to Firebase:', err);
+            });
+    }
+    
+    // Play send sound
+    playSendSound();
+}
+
+function playSendSound() {
+    try {
+        var ctx = new (window.AudioContext || window.webkitAudioContext)();
+        var osc = ctx.createOscillator();
+        var gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.frequency.value = 800;
+        gain.gain.value = 0.1;
+        osc.start();
+        osc.stop(ctx.currentTime + 0.1);
+    } catch(e) {}
+}
+
+function playReceiveSound() {
+    try {
+        var ctx = new (window.AudioContext || window.webkitAudioContext)();
+        var osc = ctx.createOscillator();
+        var gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.frequency.value = 600;
+        gain.gain.value = 0.1;
+        osc.start();
+        osc.stop(ctx.currentTime + 0.15);
+    } catch(e) {}
+}
+        
+        oscillator.start();
+        oscillator.stop(audioContext.currentTime + 0.1);
+    } catch (e) {
+        // Audio not supported
+    }
+}
+
+function sendFileMessage(file, fileData) {
+    if (!activeChat) return;
+    
+    var messages = Storage.get('messages') || [];
+    var newMessage = {
+        id: generateId(),
+        chatId: activeChat.id,
+        senderId: currentUser.id,
+        senderName: currentUser.name,
+        text: '📎 ' + file.name,
+        fileData: fileData,
+        fileName: file.name,
+        fileType: file.type,
         timestamp: new Date().toISOString(),
         read: false,
         status: 'sent',
@@ -710,14 +1183,61 @@ function sendMessage(text) {
         forwarded: false
     };
     
+    // Save locally
     messages.push(newMessage);
     Storage.set('messages', messages);
     
-    // Sync to Firebase for cross-browser/device messaging
-    syncMessageToFirebase(newMessage);
+    // Update UI
+    renderMessages(activeChat.id);
+    loadChats();
+    
+    // Send to Firebase
+    if (typeof sendMsgToFirebase === 'function') {
+        sendMsgToFirebase(newMessage).then(function() {
+            newMessage.status = 'delivered';
+            Storage.set('messages', messages);
+            renderMessages(activeChat.id);
+        });
+    }
+    
+    showToast('File sent!', 'success');
+}
+            Storage.set('messages', messages);
+            renderMessages(activeChat.id);
+        });
+    }
     
     renderMessages(activeChat.id);
     loadChats();
+    showToast('File sent!', 'success');
+}
+
+function startReply(messageId) {
+    var messages = Storage.get('messages') || [];
+    var message = messages.find(function(m) { return m.id === messageId; });
+    if (!message || !activeChat) return;
+    
+    currentReplyTo = messageId;
+    
+    // Find the sender name
+    var users = Storage.get('users') || [];
+    var sender = users.find(function(u) { return u.id === message.senderId; });
+    var senderName = sender ? sender.name : 'Unknown';
+    
+    // Show reply preview
+    document.getElementById('reply-preview').style.display = 'flex';
+    document.getElementById('reply-to').textContent = senderName;
+    document.getElementById('reply-text').textContent = message.text.substring(0, 50) + (message.text.length > 50 ? '...' : '');
+    
+    // Focus message input
+    document.getElementById('message-input').focus();
+}
+
+function clearReplyPreview() {
+    currentReplyTo = null;
+    document.getElementById('reply-preview').style.display = 'none';
+    document.getElementById('reply-to').textContent = '';
+    document.getElementById('reply-text').textContent = '';
 }
 
 function startNewChat() {
@@ -745,6 +1265,92 @@ function startNewChat() {
     showModal(html);
 }
 
+function handleMentionInput(input) {
+    var text = input.value;
+    var cursorPos = input.selectionStart;
+    var textBeforeCursor = text.substring(0, cursorPos);
+    
+    // Check if we're in a mention context (after @)
+    var mentionMatch = textBeforeCursor.match(/@(\w*)$/);
+    
+    if (mentionMatch) {
+        var query = mentionMatch[1];
+        var users = Storage.get('users') || [];
+        var chatUsers = [];
+        
+        if (activeChat) {
+            var chats = Storage.get('chats') || [];
+            var chat = chats.find(function(c) { return c.id === activeChat.id; });
+            if (chat) {
+                chatUsers = users.filter(function(u) { return chat.participants.includes(u.id) && u.id !== currentUser.id; });
+            }
+        } else {
+            chatUsers = users.filter(function(u) { return u.id !== currentUser.id; });
+        }
+        
+        var filteredUsers = chatUsers.filter(function(u) {
+            return u.username.toLowerCase().startsWith(query.toLowerCase()) ||
+                   u.name.toLowerCase().startsWith(query.toLowerCase());
+        });
+        
+        if (filteredUsers.length > 0) {
+            showMentionsDropdown(filteredUsers, mentionMatch[0].length);
+        } else {
+            hideMentionsDropdown();
+        }
+    } else {
+        hideMentionsDropdown();
+    }
+}
+
+function showMentionsDropdown(users, mentionLength) {
+    var dropdown = document.getElementById('mentions-dropdown');
+    var input = document.getElementById('message-input');
+    
+    var html = '';
+    users.forEach(function(user) {
+        html += '<div class="mention-item" onclick="selectMention(\'' + user.username + '\', ' + mentionLength + ')">';
+        html += '<span class="mention-name">' + user.name + '</span>';
+        html += '<span class="mention-username">@' + user.username + '</span>';
+        html += '</div>';
+    });
+    
+    dropdown.innerHTML = html;
+    
+    // Position the dropdown below the input
+    var inputRect = input.getBoundingClientRect();
+    dropdown.style.top = (inputRect.bottom + window.scrollY + 5) + 'px';
+    dropdown.style.left = inputRect.left + 'px';
+    dropdown.style.width = inputRect.width + 'px';
+    dropdown.style.display = 'block';
+}
+
+function selectMention(username, mentionLength) {
+    var input = document.getElementById('message-input');
+    var text = input.value;
+    var cursorPos = input.selectionStart;
+    
+    // Find the @ position
+    var textBeforeCursor = text.substring(0, cursorPos);
+    var atIndex = textBeforeCursor.lastIndexOf('@');
+    
+    if (atIndex !== -1) {
+        var newText = text.substring(0, atIndex) + '@' + username + ' ' + text.substring(cursorPos);
+        input.value = newText;
+        
+        // Set cursor position after the mention
+        var newCursorPos = atIndex + username.length + 2;
+        input.setSelectionRange(newCursorPos, newCursorPos);
+    }
+    
+    hideMentionsDropdown();
+    input.focus();
+}
+
+function hideMentionsDropdown() {
+    document.getElementById('mentions-dropdown').style.display = 'none';
+}
+
 function createNewChat(userId) {
     var chats = Storage.get('chats') || [];
     var newChat = {
@@ -756,8 +1362,16 @@ function createNewChat(userId) {
         archived: false,
         isGroup: false
     };
+    
+    // Save locally
     chats.push(newChat);
     Storage.set('chats', chats);
+    
+    // Sync to Firebase (so other user can see it)
+    if (typeof syncChat === 'function') {
+        syncChat(newChat);
+    }
+    
     closeModal();
     loadChats();
     openChat(newChat.id, userId);
@@ -777,6 +1391,14 @@ function loadProfile() {
     document.getElementById('edit-phone').value = currentUser.phone || '';
     document.getElementById('edit-location').value = currentUser.location || '';
     
+    // Display avatar if exists
+    var profileAvatar = document.getElementById('profile-avatar');
+    if (currentUser.avatar) {
+        profileAvatar.innerHTML = '<img src="' + currentUser.avatar + '" alt="Avatar">';
+    } else {
+        profileAvatar.innerHTML = '<i class="fas fa-user"></i>';
+    }
+    
     var chats = Storage.get('chats') || [];
     var myChats = chats.filter(function(c) { return c.participants.indexOf(currentUser.id) !== -1; });
     document.getElementById('profile-chats').textContent = myChats.length;
@@ -794,6 +1416,12 @@ function updateProfile(data) {
     currentUser = users[userIndex];
     updateSidebar();
     loadProfile();
+    
+    // Sync updated profile to Firebase
+    if (typeof syncUserToFirebase === 'function') {
+        syncUserToFirebase(currentUser);
+    }
+    
     showToast('Profile updated', 'success');
 }
 
@@ -960,10 +1588,53 @@ function loadAdminData() {
     document.getElementById('active-users').textContent = users.filter(function(u) { return u.status === 'active'; }).length;
     document.getElementById('banned-users').textContent = users.filter(function(u) { return u.status === 'banned'; }).length;
     
+    renderAdminUsersTable(users);
+    
+    // Load system logs
+    var logs = Storage.get('logs') || [];
+    var logsContainer = document.getElementById('system-logs');
+    if (logs.length === 0) {
+        logsContainer.innerHTML = '<div class="empty-state"><p>No system logs</p></div>';
+    } else {
+        logsContainer.innerHTML = logs.slice(0, 20).map(function(log) {
+            var icon = log.type === 'error' ? 'fa-exclamation-circle' : log.type === 'warning' ? 'fa-exclamation-triangle' : 'fa-info-circle';
+            var color = log.type === 'error' ? '#ff4d4d' : log.type === 'warning' ? '#ffd54d' : '#4CAF50';
+            return '<div class="log-item"><i class="fas ' + icon + '" style="color:' + color + '"></i><span>' + log.message + '</span><small>' + formatDate(log.timestamp) + '</small></div>';
+        }).join('');
+    }
+}
+
+function renderAdminUsersTable(users) {
     var tbody = document.getElementById('users-table-body');
     tbody.innerHTML = users.map(function(user) {
-        return '<tr><td>' + user.name + '</td><td>' + user.email + '</td><td><span class="role-badge ' + user.role + '">' + user.role + '</span></td><td>' + user.status + '</td><td>' + formatDate(user.createdAt) + '</td></tr>';
+        var actions = '';
+        if (user.id !== currentUser.id) {
+            actions = '<button class="btn btn-small" onclick="toggleUserBan(\'' + user.id + '\')">' + (user.status === 'banned' ? 'Unban' : 'Ban') + '</button>';
+        }
+        return '<tr><td>' + user.name + '</td><td>' + user.email + '</td><td><span class="role-badge ' + user.role + '">' + user.role + '</span></td><td>' + user.status + '</td><td>' + formatDate(user.createdAt) + '</td><td>' + actions + '</td></tr>';
     }).join('');
+}
+
+function toggleUserBan(userId) {
+    var users = Storage.get('users') || [];
+    var user = users.find(function(u) { return u.id === userId; });
+    if (user) {
+        user.status = user.status === 'banned' ? 'active' : 'banned';
+        Storage.set('users', users);
+        addLog('warning', (user.status === 'banned' ? 'Banned' : 'Unbanned') + ' user: ' + user.username);
+        loadAdminData();
+        showToast('User ' + (user.status === 'banned' ? 'banned' : 'unbanned'), 'success');
+    }
+}
+
+function searchAdminUsers(query) {
+    var users = Storage.get('users') || [];
+    var filtered = users.filter(function(u) {
+        return u.name.toLowerCase().includes(query.toLowerCase()) ||
+               u.email.toLowerCase().includes(query.toLowerCase()) ||
+               u.username.toLowerCase().includes(query.toLowerCase());
+    });
+    renderAdminUsersTable(filtered);
 }
 
 // ==========================================
@@ -1141,8 +1812,8 @@ function archiveChat() {
         Storage.set('chats', chats);
         closeModal();
         activeChat = null;
-        document.getElementById('chat-section').classList.remove('active');
-        document.getElementById('empty-chat').classList.add('active');
+        document.getElementById('chat-placeholder').style.display = 'block';
+        document.getElementById('chat-active').style.display = 'none';
         loadChats();
         showToast('Chat archived', 'success');
     }
@@ -1170,8 +1841,8 @@ function deleteChat() {
     
     closeModal();
     activeChat = null;
-    document.getElementById('chat-section').classList.remove('active');
-    document.getElementById('empty-chat').classList.add('active');
+    document.getElementById('chat-placeholder').style.display = 'block';
+    document.getElementById('chat-active').style.display = 'none';
     loadChats();
     showToast('Chat deleted', 'success');
 }
@@ -1187,34 +1858,19 @@ function attachFile() {
     
     var input = document.createElement('input');
     input.type = 'file';
-    input.accept = 'image/*,video/*,audio/*,.pdf,.doc,.docx,.txt';
+    input.accept = 'image/*,video/*,audio/*,.pdf,.doc,.docx,.txt,.zip,.rar,.xls,.xlsx,.ppt,.pptx';
     input.onchange = function(e) {
         var file = e.target.files[0];
         if (file) {
+            // Check file size (max 10MB)
+            if (file.size > 10 * 1024 * 1024) {
+                showToast('File too large. Max 10MB allowed.', 'error');
+                return;
+            }
+            
             var reader = new FileReader();
             reader.onload = function(event) {
-                var messages = Storage.get('messages') || [];
-                var newMessage = {
-                    id: generateId(),
-                    chatId: activeChat.id,
-                    senderId: currentUser.id,
-                    text: '📎 ' + file.name,
-                    fileData: event.target.result,
-                    fileName: file.name,
-                    fileType: file.type,
-                    timestamp: new Date().toISOString(),
-                    read: false,
-                    status: 'sent',
-                    reactions: {},
-                    edited: false,
-                    starred: false,
-                    replyTo: null,
-                    forwarded: false
-                };
-                messages.push(newMessage);
-                Storage.set('messages', messages);
-                loadChatMessages(activeChat.id);
-                showToast('File sent!', 'success');
+                sendFileMessage(file, event.target.result);
             };
             reader.readAsDataURL(file);
         }
@@ -1233,13 +1889,54 @@ function showGifPicker() {
     picker.style.display = isVisible ? 'none' : 'flex';
     
     if (!isVisible) {
-        populateGifPicker();
+        populateGifPicker('trending');
+        document.getElementById('gif-search').value = '';
     }
     
     document.getElementById('emoji-picker').style.display = 'none';
 }
 
-function populateGifPicker() {
+function searchGifs(query) {
+    if (!query.trim()) {
+        populateGifPicker('trending');
+        return;
+    }
+    
+    var grid = document.getElementById('gif-grid');
+    grid.innerHTML = '<div class="gif-loading"><i class="fas fa-spinner fa-spin"></i> Searching...</div>';
+    
+    // Use Giphy API (public beta key for limited use)
+    var apiKey = 'dc6zaTOxFJmzC'; // Giphy public beta key
+    var url = 'https://api.giphy.com/v1/gifs/search?q=' + encodeURIComponent(query) + '&api_key=' + apiKey + '&limit=24&rating=g';
+    
+    fetch(url)
+        .then(function(response) { return response.json(); })
+        .then(function(data) {
+            grid.innerHTML = '';
+            if (data.data && data.data.length > 0) {
+                data.data.forEach(function(gif) {
+                    var item = document.createElement('div');
+                    item.className = 'gif-item';
+                    var img = document.createElement('img');
+                    img.src = gif.images.fixed_height.url;
+                    img.alt = gif.title || 'GIF';
+                    item.appendChild(img);
+                    item.onclick = function() {
+                        sendGif(gif.images.fixed_height.url);
+                    };
+                    grid.appendChild(item);
+                });
+            } else {
+                grid.innerHTML = '<div class="gif-no-results">No GIFs found. Try a different search.</div>';
+            }
+        })
+        .catch(function() {
+            // Fallback to default GIFs
+            populateGifPicker('trending');
+        });
+}
+
+function populateGifPicker(type) {
     var grid = document.getElementById('gif-grid');
     var gifs = [
         'https://media.giphy.com/media/3o7TKMt1VVNkHV2PaE/giphy.gif',
@@ -1281,6 +1978,7 @@ function sendGif(gifUrl) {
         id: generateId(),
         chatId: activeChat.id,
         senderId: currentUser.id,
+        senderName: currentUser.name,
         text: 'GIF',
         gifUrl: gifUrl,
         timestamp: new Date().toISOString(),
@@ -1292,10 +1990,31 @@ function sendGif(gifUrl) {
         replyTo: null,
         forwarded: false
     };
+    
+    // Save locally
     messages.push(newMessage);
     Storage.set('messages', messages);
+    
+    // Update UI
     document.getElementById('gif-picker').style.display = 'none';
-    loadChatMessages(activeChat.id);
+    renderMessages(activeChat.id);
+    loadChats();
+    
+    // Send to Firebase
+    if (typeof sendMsgToFirebase === 'function') {
+        sendMsgToFirebase(newMessage).then(function() {
+            newMessage.status = 'delivered';
+            Storage.set('messages', messages);
+            renderMessages(activeChat.id);
+        });
+    }
+    
+    showToast('GIF sent!', 'success');
+}
+    
+    document.getElementById('gif-picker').style.display = 'none';
+    renderMessages(activeChat.id);
+    loadChats();
     showToast('GIF sent!', 'success');
 }
 
@@ -1343,10 +2062,23 @@ function startRecording() {
                         replyTo: null,
                         forwarded: false
                     };
+                    
+                    // Save to local storage
                     messages.push(newMessage);
                     Storage.set('messages', messages);
+                    
+                    // Send to Firebase for real-time delivery
+                    if (typeof sendMessageToFirebase === 'function') {
+                        sendMessageToFirebase(newMessage).then(function() {
+                            newMessage.status = 'delivered';
+                            Storage.set('messages', messages);
+                            renderMessages(activeChat.id);
+                        });
+                    }
+                    
                     closeModal();
-                    loadChatMessages(activeChat.id);
+                    renderMessages(activeChat.id);
+                    loadChats();
                     showToast('Voice message sent!', 'success');
                 };
                 reader.readAsDataURL(audioBlob);
@@ -1472,6 +2204,11 @@ function createGroup() {
     chats.push(newChat);
     Storage.set('chats', chats);
     
+    // Sync group to Firebase so all participants can see it
+    if (typeof syncChat === 'function') {
+        syncChat(newChat);
+    }
+    
     closeModal();
     loadChats();
     showToast('Group created!', 'success');
@@ -1481,7 +2218,47 @@ function createGroup() {
 // Profile Functions
 // ==========================================
 function changeAvatar() {
-    showToast('Avatar change coming soon', 'info');
+    document.getElementById('avatar-input').click();
+}
+
+function handleAvatarUpload(event) {
+    var file = event.target.files[0];
+    if (!file) return;
+    
+    if (!file.type.startsWith('image/')) {
+        showToast('Please select an image file', 'error');
+        return;
+    }
+    
+    var reader = new FileReader();
+    reader.onload = function(e) {
+        var avatarData = e.target.result;
+        
+        // Update user data
+        var users = Storage.get('users') || [];
+        var userIndex = users.findIndex(function(u) { return u.id === currentUser.id; });
+        if (userIndex !== -1) {
+            users[userIndex].avatar = avatarData;
+            Storage.set('users', users);
+            currentUser.avatar = avatarData;
+            
+            // Update profile avatar display
+            var profileAvatar = document.getElementById('profile-avatar');
+            profileAvatar.innerHTML = '<img src="' + avatarData + '" alt="Avatar">';
+            
+            // Update sidebar avatar
+            var sidebarAvatar = document.getElementById('sidebar-avatar');
+            sidebarAvatar.innerHTML = '<img src="' + avatarData + '" alt="Avatar">';
+            
+            // Sync updated avatar to Firebase
+            if (typeof syncUserToFirebase === 'function') {
+                syncUserToFirebase(currentUser);
+            }
+            
+            showToast('Avatar updated!', 'success');
+        }
+    };
+    reader.readAsDataURL(file);
 }
 
 // ==========================================
@@ -1602,6 +2379,40 @@ function exportData() {
     showToast('Data exported!', 'success');
 }
 
+function updatePasswordStrength(password) {
+    var strengthEl = document.getElementById('password-strength');
+    if (!strengthEl) return;
+    
+    var strength = 0;
+    var feedback = [];
+    
+    if (password.length >= 6) {
+        strength++;
+        feedback.push('6+ chars');
+    }
+    if (password.length >= 10) {
+        strength++;
+    }
+    if (/[A-Z]/.test(password)) {
+        strength++;
+        feedback.push('uppercase');
+    }
+    if (/[0-9]/.test(password)) {
+        strength++;
+        feedback.push('numbers');
+    }
+    if (/[^A-Za-z0-9]/.test(password)) {
+        strength++;
+        feedback.push('symbols');
+    }
+    
+    var colors = ['#ff4d4d', '#ff944d', '#ffd54d', '#90EE90', '#4CAF50'];
+    var labels = ['Weak', 'Fair', 'Good', 'Strong', 'Very Strong'];
+    
+    strengthEl.innerHTML = '<div class="password-strength-bar"><div class="password-strength-fill" style="width:' + (strength * 20) + '%; background:' + colors[strength - 1] + '"></div></div>';
+    strengthEl.innerHTML += '<span class="password-strength-label" style="color:' + colors[strength - 1] + '">' + (labels[strength - 1] || '') + '</span>';
+}
+
 function clearCache() {
     localStorage.clear();
     showToast('Cache cleared', 'success');
@@ -1628,6 +2439,49 @@ function deleteAccount() {
     localStorage.removeItem('currentUser');
     showToast('Account deleted', 'success');
     setTimeout(function() { location.reload(); }, 1000);
+}
+
+function showForgotPassword() {
+    var html = '<div class="forgot-password"><h3>Reset Password</h3>';
+    html += '<p>Enter your email to receive reset instructions.</p>';
+    html += '<input type="email" id="reset-email" placeholder="Your email">';
+    html += '<button class="btn btn-primary" onclick="sendPasswordReset()">Send Reset Link</button>';
+    html += '</div>';
+    showModal(html);
+}
+
+function sendPasswordReset() {
+    var email = document.getElementById('reset-email').value;
+    var users = Storage.get('users') || [];
+    var user = users.find(function(u) { return u.email === email; });
+    
+    if (!user) {
+        showToast('Email not found', 'error');
+        return;
+    }
+    
+    // In a real app, this would send an email. For now, just show a success message.
+    closeModal();
+    showToast('Password reset link sent to ' + email, 'success');
+}
+
+function showTermsOfService() {
+    var html = '<div class="terms-of-service"><h3>Terms of Service</h3>';
+    html += '<div style="max-height: 300px; overflow-y: auto; text-align: left;">';
+    html += '<h4>1. Acceptance of Terms</h4>';
+    html += '<p>By using BSITHUB, you agree to these terms.</p>';
+    html += '<h4>2. Use of Service</h4>';
+    html += '<p>You must be respectful to other users. Harassment and abuse are prohibited.</p>';
+    html += '<h4>3. Privacy</h4>';
+    html += '<p>Your data is stored locally on your device and on Firebase servers for messaging.</p>';
+    html += '<h4>4. Account Termination</h4>';
+    html += '<p>We reserve the right to terminate accounts that violate these terms.</p>';
+    html += '<h4>5. Changes to Terms</h4>';
+    html += '<p>We may update these terms at any time. Continued use constitutes acceptance.</p>';
+    html += '</div>';
+    html += '<button class="btn btn-primary" onclick="closeModal()">Close</button>';
+    html += '</div>';
+    showModal(html);
 }
 
 // ==========================================
@@ -1665,6 +2519,22 @@ document.addEventListener('DOMContentLoaded', function() {
         };
     });
     
+    // Forgot Password
+    document.getElementById('forgot-password-link').onclick = function(e) {
+        e.preventDefault();
+        showForgotPassword();
+    };
+    
+    // Terms of Service link
+    document.querySelectorAll('a[href="#"]').forEach(function(link) {
+        if (link.textContent.includes('Terms of Service')) {
+            link.onclick = function(e) {
+                e.preventDefault();
+                showTermsOfService();
+            };
+        }
+    });
+    
     // Login form
     document.getElementById('login-form').onsubmit = function(e) {
         e.preventDefault();
@@ -1685,6 +2555,27 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         return false;
     };
+    
+    // Remember me checkbox
+    var rememberMe = document.getElementById('remember-me');
+    var savedEmail = localStorage.getItem('rememberedEmail');
+    if (savedEmail) {
+        document.getElementById('login-email').value = savedEmail;
+        rememberMe.checked = true;
+    }
+    
+    document.getElementById('login-form').addEventListener('submit', function() {
+        if (rememberMe.checked) {
+            localStorage.setItem('rememberedEmail', document.getElementById('login-email').value);
+        } else {
+            localStorage.removeItem('rememberedEmail');
+        }
+    });
+    
+    // Password strength meter
+    document.getElementById('register-password').addEventListener('input', function(e) {
+        updatePasswordStrength(e.target.value);
+    });
     
     // Register form
     document.getElementById('register-form').onsubmit = function(e) {
@@ -1732,7 +2623,49 @@ document.addEventListener('DOMContentLoaded', function() {
     
     document.getElementById('message-input').oninput = function() {
         sendTypingIndicator();
+        handleMentionInput(this);
     };
+    
+    document.getElementById('message-input').onkeydown = function(e) {
+        if (e.key === 'Escape') {
+            hideMentionsDropdown();
+        }
+    };
+    
+    // Chat tabs (All, Pinned, Unread)
+    document.querySelectorAll('.chat-tab').forEach(function(tab) {
+        tab.onclick = function() {
+            document.querySelectorAll('.chat-tab').forEach(function(t) { t.classList.remove('active'); });
+            this.classList.add('active');
+            
+            var tabType = this.dataset.tab;
+            pinnedChatsView = (tabType === 'pinned');
+            
+            // For unread tab, we need to filter differently
+            if (tabType === 'unread') {
+                // Load chats with unread messages
+                loadChatsWithUnread();
+            } else {
+                loadChats();
+            }
+        };
+    });
+    
+    // Chat search
+    document.getElementById('chat-search').addEventListener('input', function(e) {
+        var query = e.target.value.toLowerCase();
+        var chatItems = document.querySelectorAll('.chat-item');
+        
+        chatItems.forEach(function(item) {
+            var name = item.querySelector('.chat-item-name').textContent.toLowerCase();
+            var message = item.querySelector('.chat-item-message').textContent.toLowerCase();
+            if (name.includes(query) || message.includes(query)) {
+                item.style.display = '';
+            } else {
+                item.style.display = 'none';
+            }
+        });
+    });
     
     // Profile form
     document.getElementById('profile-form').onsubmit = function(e) {
@@ -1753,6 +2686,11 @@ document.addEventListener('DOMContentLoaded', function() {
     // Version History
     document.getElementById('version-history-btn').onclick = showVersionHistory;
     
+    // Version panel close
+    document.getElementById('close-version-panel').onclick = function() {
+        document.getElementById('version-panel').classList.remove('active');
+    };
+    
     // Archived Chats
     document.getElementById('archived-chats-btn').onclick = toggleArchivedChats;
     
@@ -1767,11 +2705,20 @@ document.addEventListener('DOMContentLoaded', function() {
     // Chat Options
     document.getElementById('chat-options-btn').onclick = showChatOptions;
     
+    // Cancel reply
+    document.getElementById('cancel-reply').onclick = function() {
+        document.getElementById('reply-preview').style.display = 'none';
+        currentReplyTo = null;
+    };
+    
     // Attach File
     document.getElementById('attach-file-btn').onclick = attachFile;
     
     // GIF
     document.getElementById('gif-btn').onclick = showGifPicker;
+    document.getElementById('gif-search').addEventListener('input', function(e) {
+        searchGifs(e.target.value);
+    });
     
     // Voice Message
     document.getElementById('voice-btn').onclick = toggleVoiceMessage;
@@ -1784,12 +2731,18 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Change Avatar
     document.getElementById('change-avatar-btn').onclick = changeAvatar;
+    document.getElementById('avatar-input').addEventListener('change', handleAvatarUpload);
     
     // Chat Wallpaper
     document.getElementById('chat-wallpaper-btn').onclick = showWallpaperPicker;
     
     // Change Password
     document.getElementById('change-password-btn').onclick = showChangePassword;
+    
+    // Admin user search
+    document.getElementById('admin-user-search').addEventListener('input', function(e) {
+        searchAdminUsers(e.target.value);
+    });
     
     // Blocked Users
     document.getElementById('blocked-users-btn').onclick = showBlockedUsers;

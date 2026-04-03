@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Create Test Accounts</title>
+    <style>
+        body { font-family: Arial; padding: 20px; background: #f5f5f5; }
+        .container { max-width: 500px; margin: 0 auto; background: white; padding: 20px; border-radius: 10px; }
+        button { padding: 10px 20px; margin: 10px 5px; cursor: pointer; background: #667eea; color: white; border: none; border-radius: 5px; font-size: 16px; }
+        button:hover { background: #5a6fd6; }
+        .info { background: #e8f5e9; padding: 15px; border-radius: 5px; margin: 10px 0; }
+        .success { color: green; font-weight: bold; }
+        .error { color: red; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Test Account Creator</h1>
+        <p>Click the button below to create test accounts in your browser.</p>
+        
+        <button onclick="createAccounts()">Create Test Accounts</button>
+        <button onclick="showAccounts()">Show Existing Accounts</button>
+        <button onclick="clearAll()">Clear All Data</button>
+        
+        <div id="result"></div>
+        
+        <div class="info">
+            <h3>Test Accounts:</h3>
+            <p><b>User A:</b></p>
+            <ul>
+                <li>Email: testuser1@bsithub.com</li>
+                <li>Password: password123</li>
+                <li>Username: testuser1</li>
+            </ul>
+            <p><b>User B:</b></p>
+            <ul>
+                <li>Email: testuser2@bsithub.com</li>
+                <li>Password: password123</li>
+                <li>Username: testuser2</li>
+            </ul>
+            <p><b>User C:</b></p>
+            <ul>
+                <li>Email: testuser3@bsithub.com</li>
+                <li>Password: password123</li>
+                <li>Username: testuser3</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        function generateId() {
+            return Math.random().toString(36).substr(2, 18);
+        }
+
+        function hashPassword(password) {
+            return btoa(password);
+        }
+
+        function createAccounts() {
+            var users = JSON.parse(localStorage.getItem('users') || '[]');
+            var created = [];
+            
+            var testUsers = [
+                {
+                    id: generateId(),
+                    name: 'Test User 1',
+                    username: 'testuser1',
+                    email: 'testuser1@bsithub.com',
+                    password: hashPassword('password123'),
+                    role: 'user',
+                    status: 'active',
+                    bio: 'I am Test User 1',
+                    phone: '',
+                    location: 'Test City',
+                    createdAt: new Date().toISOString(),
+                    avatar: null,
+                    blockedUsers: []
+                },
+                {
+                    id: generateId(),
+                    name: 'Test User 2',
+                    username: 'testuser2',
+                    email: 'testuser2@bsithub.com',
+                    password: hashPassword('password123'),
+                    role: 'user',
+                    status: 'active',
+                    bio: 'I am Test User 2',
+                    phone: '',
+                    location: 'Test City',
+                    createdAt: new Date().toISOString(),
+                    avatar: null,
+                    blockedUsers: []
+                },
+                {
+                    id: generateId(),
+                    name: 'Test User 3',
+                    username: 'testuser3',
+                    email: 'testuser3@bsithub.com',
+                    password: hashPassword('password123'),
+                    role: 'user',
+                    status: 'active',
+                    bio: 'I am Test User 3',
+                    phone: '',
+                    location: 'Test City',
+                    createdAt: new Date().toISOString(),
+                    avatar: null,
+                    blockedUsers: []
+                },
+                {
+                    id: generateId(),
+                    name: 'Admin',
+                    username: 'admin',
+                    email: 'admin@bsithub.com',
+                    password: hashPassword('admin123'),
+                    role: 'admin',
+                    status: 'active',
+                    bio: 'I am the Admin',
+                    phone: '',
+                    location: 'Admin City',
+                    createdAt: new Date().toISOString(),
+                    avatar: null,
+                    blockedUsers: []
+                }
+            ];
+            
+            testUsers.forEach(function(testUser) {
+                var exists = users.find(function(u) { 
+                    return u.email === testUser.email || u.username === testUser.username; 
+                });
+                
+                if (!exists) {
+                    users.push(testUser);
+                    created.push(testUser.username);
+                }
+            });
+            
+            localStorage.setItem('users', JSON.stringify(users));
+            
+            var html = '<div class="success">Done! Created accounts: ' + (created.length > 0 ? created.join(', ') : 'None (already exist)') + '</div>';
+            html += '<p><a href="index.html">Go to BSITHUB App →</a></p>';
+            document.getElementById('result').innerHTML = html;
+        }
+
+        function showAccounts() {
+            var users = JSON.parse(localStorage.getItem('users') || '[]');
+            
+            if (users.length === 0) {
+                document.getElementById('result').innerHTML = '<p>No accounts found.</p>';
+                return;
+            }
+            
+            var html = '<h3>Existing Accounts:</h3><ul>';
+            users.forEach(function(user) {
+                html += '<li><b>' + user.name + '</b> (@' + user.username + ') - ' + user.email + '</li>';
+            });
+            html += '</ul>';
+            
+            document.getElementById('result').innerHTML = html;
+        }
+
+        function clearAll() {
+            if (confirm('Are you sure you want to clear ALL data? This cannot be undone!')) {
+                localStorage.clear();
+                document.getElementById('result').innerHTML = '<p>All data cleared! <a href="index.html">Go to app</a></p>';
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,8 +1,8 @@
 // ==========================================
 // Firebase Real-time Messaging for BSITHUB
+// Simple Message Queue System
 // ==========================================
 
-// Firebase Configuration
 var firebaseConfig = {
     apiKey: "AIzaSyDqCLKvwD3j9z_EQCzHrtcGXOpYgXPm3yw",
     authDomain: "bsithub-1974a.firebaseapp.com",
@@ -13,173 +13,312 @@ var firebaseConfig = {
     appId: "1:790480652401:web:38e18646da4869c3da73d0"
 };
 
-// Initialize Firebase
 var firebaseApp = null;
 var firebaseDb = null;
 var firebaseInitialized = false;
 
-function initFirebaseMessaging() {
-    if (firebaseInitialized) return;
-    
-    if (typeof firebase === 'undefined') {
-        console.warn('Firebase SDK not loaded, will retry...');
-        setTimeout(initFirebaseMessaging, 1000);
-        return;
-    }
+function initFirebase() {
+    if (firebaseInitialized) return true;
     
     try {
+        if (typeof firebase === 'undefined') {
+            console.log('Firebase SDK not loaded yet, retrying in 500ms...');
+            setTimeout(initFirebase, 500);
+            return false;
+        }
+        
+        if (typeof firebase.database !== 'function') {
+            console.log('Firebase database SDK not loaded yet, retrying in 500ms...');
+            setTimeout(initFirebase, 500);
+            return false;
+        }
+        
         if (!firebase.apps.length) {
             firebaseApp = firebase.initializeApp(firebaseConfig);
         } else {
             firebaseApp = firebase.app();
         }
+        
         firebaseDb = firebase.database();
         firebaseInitialized = true;
-        console.log('Firebase initialized for messaging');
+        console.log('Firebase initialized successfully!');
+        return true;
     } catch (e) {
-        console.warn('Firebase initialization failed:', e);
+        console.error('Firebase init error:', e);
+        console.log('Retrying in 1 second...');
+        setTimeout(initFirebase, 1000);
+        return false;
+    }
+}
+        return false;
     }
 }
 
 // ==========================================
-// Sync Messages to Firebase
+// SEND MESSAGE - Simple approach
 // ==========================================
-
-function syncMessageToFirebase(message) {
-    if (!firebaseDb || !message) return;
-    
-    var messageRef = firebaseDb.ref('messages/' + message.chatId + '/' + message.id);
-    messageRef.set(message).catch(function(err) {
-        console.error('Error syncing message:', err);
+function sendMsgToFirebase(msg) {
+    return new Promise(function(resolve, reject) {
+        function trySend() {
+            if (!firebaseDb) {
+                console.log('Firebase not ready, retrying sendMsgToFirebase in 1 second...');
+                setTimeout(trySend, 1000);
+                return;
+            }
+            
+            // Store message under: messages/{chatId}/{messageId}
+            var path = 'messages/' + msg.chatId + '/' + msg.id;
+            firebaseDb.ref(path).set(msg)
+                .then(resolve)
+                .catch(reject);
+        }
+        trySend();
     });
 }
 
 // ==========================================
-// Listen for Messages from Firebase
+// LISTEN FOR MESSAGES - Real-time
 // ==========================================
+var activeListeners = {};
 
-var firebaseListeners = {};
-
-function listenForMessages(chatId, callback) {
-    if (!firebaseDb) return;
-    
-    // Remove existing listener for this chat
-    if (firebaseListeners[chatId]) {
-        firebaseListeners[chatId].off();
+function listenChat(chatId, onNewMessage) {
+    if (!firebaseDb) {
+        console.log('Firebase not ready, retrying listenChat in 1 second...');
+        setTimeout(function() { listenChat(chatId, onNewMessage); }, 1000);
+        return;
     }
     
-    var messagesRef = firebaseDb.ref('messages/' + chatId);
+    // Remove old listener
+    if (activeListeners[chatId]) {
+        activeListeners[chatId].off();
+    }
     
-    firebaseListeners[chatId] = messagesRef;
+    var ref = firebaseDb.ref('messages/' + chatId);
+    activeListeners[chatId] = ref;
     
-    messagesRef.on('value', function(snapshot) {
-        var messages = snapshot.val();
-        if (messages) {
-            var messagesArray = Object.values(messages);
-            messagesArray.sort(function(a, b) {
-                return new Date(a.timestamp) - new Date(b.timestamp);
+    ref.on('child_added', function(snapshot) {
+        var msg = snapshot.val();
+        if (msg) {
+            console.log('New msg received:', msg.text);
+            onNewMessage(msg);
+        }
+    });
+    
+    ref.on('child_changed', function(snapshot) {
+        var msg = snapshot.val();
+        if (msg) {
+            onNewMessage(msg);
+        }
+    });
+    
+    console.log('Listening for messages in:', chatId);
+}
+
+function stopListenChat(chatId) {
+    if (activeListeners[chatId]) {
+        activeListeners[chatId].off();
+        delete activeListeners[chatId];
+    }
+}
+
+// ==========================================
+// LOAD ALL MESSAGES FOR CHAT
+// ==========================================
+function loadChatMessages(chatId) {
+    return new Promise(function(resolve) {
+        function tryLoad() {
+            if (!firebaseDb) {
+                console.log('Firebase not ready, retrying loadChatMessages in 1 second...');
+                setTimeout(tryLoad, 1000);
+                return;
+            }
+            
+            firebaseDb.ref('messages/' + chatId)
+                .once('value')
+                .then(function(snap) {
+                    var msgs = [];
+                    if (snap.val()) {
+                        snap.forEach(function(child) {
+                            msgs.push(child.val());
+                        });
+                    }
+                    msgs.sort(function(a, b) {
+                        return new Date(a.timestamp) - new Date(b.timestamp);
+                    });
+                    resolve(msgs);
+                })
+                .catch(function() {
+                    resolve([]);
+                });
+        }
+        tryLoad();
+    });
+}
+
+// ==========================================
+// SYNC CHAT TO ALL PARTICIPANTS
+// ==========================================
+function syncChat(chat) {
+    if (!chat) return;
+    
+    function trySync() {
+        if (!firebaseDb) {
+            console.log('Firebase not ready, retrying syncChat in 1 second...');
+            setTimeout(trySync, 1000);
+            return;
+        }
+        
+        // Store chat data
+        firebaseDb.ref('chats/' + chat.id).set(chat);
+        
+        // Add chat reference to each participant
+        chat.participants.forEach(function(userId) {
+            firebaseDb.ref('userChats/' + userId + '/' + chat.id).set({
+                id: chat.id,
+                addedAt: new Date().toISOString()
             });
+        });
+        
+        console.log('Chat synced:', chat.id);
+    }
+    trySync();
+}
+
+// ==========================================
+// GET USER'S CHATS FROM FIREBASE
+// ==========================================
+function getUserChats(userId) {
+    return new Promise(function(resolve) {
+        function tryLoad() {
+            if (!firebaseDb) {
+                console.log('Firebase not ready, retrying getUserChats in 1 second...');
+                setTimeout(tryLoad, 1000);
+                return;
+            }
             
-            // Update localStorage with Firebase messages
-            var localMessages = Storage.get('messages') || [];
-            
-            messagesArray.forEach(function(fbMsg) {
-                var existingIndex = localMessages.findIndex(function(m) { return m.id === fbMsg.id; });
-                if (existingIndex === -1) {
-                    localMessages.push(fbMsg);
-                } else {
-                    localMessages[existingIndex] = fbMsg;
+            firebaseDb.ref('userChats/' + userId)
+                .once('value')
+                .then(function(snap) {
+                    var chatIds = [];
+                    if (snap.val()) {
+                        Object.keys(snap.val()).forEach(function(id) {
+                            chatIds.push(id);
+                        });
+                    }
+                    resolve(chatIds);
+                })
+                .catch(function() {
+                    resolve([]);
+                });
+        }
+        tryLoad();
+    });
+}
+
+// ==========================================
+// LISTEN FOR NEW CHATS
+// ==========================================
+function listenNewChats(userId, onNewChat) {
+    function tryListen() {
+        if (!firebaseDb) {
+            console.log('Firebase not ready, retrying listenNewChats in 1 second...');
+            setTimeout(tryListen, 1000);
+            return;
+        }
+        
+        firebaseDb.ref('userChats/' + userId).on('child_added', function(snap) {
+            var chatRef = snap.val();
+            if (chatRef) {
+                // Get full chat data
+                firebaseDb.ref('chats/' + chatRef.id).once('value').then(function(chatSnap) {
+                    if (chatSnap.val()) {
+                        onNewChat(chatSnap.val());
+                    }
+                });
+            }
+        });
+    }
+    tryListen();
+}
+
+// ==========================================
+// TYPING INDICATOR
+// ==========================================
+function setTyping(chatId, userId, isTyping) {
+function setTyping(chatId, userId, isTyping) {
+    function trySet() {
+        if (!firebaseDb) {
+            setTimeout(trySet, 1000);
+            return;
+        }
+        
+        if (isTyping) {
+            firebaseDb.ref('typing/' + chatId + '/' + userId).set(true);
+            setTimeout(function() {
+                firebaseDb.ref('typing/' + chatId + '/' + userId).remove();
+            }, 3000);
+        } else {
+            firebaseDb.ref('typing/' + chatId + '/' + userId).remove();
+        }
+    }
+    trySet();
+}
+
+function listenTyping(chatId, myUserId, callback) {
+    function tryListen() {
+        if (!firebaseDb) {
+            setTimeout(tryListen, 1000);
+            return;
+        }
+        
+        firebaseDb.ref('typing/' + chatId).on('value', function(snap) {
+            var typing = snap.val();
+            if (typing) {
+                Object.keys(typing).forEach(function(uid) {
+                    if (uid !== myUserId) {
+                    callback(uid);
                 }
             });
-            
-            Storage.set('messages', localMessages);
-            
-            if (callback) {
-                callback(messagesArray);
-            }
         }
     });
 }
 
-function stopListeningForMessages(chatId) {
-    if (firebaseListeners[chatId]) {
-        firebaseListeners[chatId].off();
-        delete firebaseListeners[chatId];
+// ==========================================
+// ONLINE STATUS
+// ==========================================
+function goOnline(userId) {
+    function tryGo() {
+        if (!firebaseDb) {
+            setTimeout(tryGo, 1000);
+            return;
+        }
+        
+        firebaseDb.ref('online/' + userId).set({
+            online: true,
+            ts: firebase.database.ServerValue.TIMESTAMP
+        });
+        
+        firebaseDb.ref('online/' + userId).onDisconnect().set({
+            online: false,
+            ts: firebase.database.ServerValue.TIMESTAMP
+        });
     }
+    tryGo();
 }
 
-// ==========================================
-// User Presence
-// ==========================================
-
-function setUserOnlineFirebase(userId) {
-    if (!firebaseDb) return;
-    
-    var userRef = firebaseDb.ref('online/' + userId);
-    userRef.set({
-        online: true,
-        lastSeen: firebase.database.ServerValue.TIMESTAMP
-    });
-    
-    userRef.onDisconnect().update({
-        online: false,
-        lastSeen: firebase.database.ServerValue.TIMESTAMP
-    });
-}
-
-function setUserOfflineFirebase(userId) {
-    if (!firebaseDb) return;
-    
-    var userRef = firebaseDb.ref('online/' + userId);
-    userRef.update({
-        online: false,
-        lastSeen: firebase.database.ServerValue.TIMESTAMP
-    });
-}
-
-function listenForUserStatus(userId, callback) {
-    if (!firebaseDb) return;
-    
-    firebaseDb.ref('online/' + userId).on('value', function(snapshot) {
-        var status = snapshot.val();
-        callback(status || { online: false });
-    });
-}
-
-// ==========================================
-// Typing Indicator via Firebase
-// ==========================================
-
-function sendTypingIndicatorFirebase(chatId, userId) {
-    if (!firebaseDb) return;
-    
-    firebaseDb.ref('typing/' + chatId).set({
-        userId: userId,
-        timestamp: firebase.database.ServerValue.TIMESTAMP
-    });
-    
-    // Auto-clear after 3 seconds
-    setTimeout(function() {
-        firebaseDb.ref('typing/' + chatId).remove();
-    }, 3000);
-}
-
-function listenForTypingIndicator(chatId, currentUserId, callback) {
-    if (!firebaseDb) return;
-    
-    firebaseDb.ref('typing/' + chatId).on('value', function(snapshot) {
-        var typing = snapshot.val();
-        if (typing && typing.userId !== currentUserId) {
-            callback(typing);
+function goOffline(userId) {
+    function tryGo() {
+        if (!firebaseDb) {
+            setTimeout(tryGo, 1000);
+            return;
         }
-    });
+        
+        firebaseDb.ref('online/' + userId).set({
+            online: false,
+            ts: firebase.database.ServerValue.TIMESTAMP
+        });
+    }
+    tryGo();
 }
 
-// ==========================================
-// Initialize Firebase on Load
-// ==========================================
-
-// Don't use DOMContentLoaded here - let app.js call initFirebaseMessaging
-// document.addEventListener('DOMContentLoaded', function() {
-//     initFirebaseMessaging();
-// });
+console.log('Firebase module loaded');
