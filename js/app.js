@@ -480,25 +480,41 @@ function socialLogin(provider) {
                     showApp();
                 }
             })
-        .catch(function(error) {
-            window.socialLoginInProgress = false;
-            console.error('Social login error:', error);
-            
-            if (error.code === 'auth/popup-closed-by-user') {
-                // Don't show toast for user closing popup
-            } else if (error.code === 'auth/cancelled-popup-request') {
-                // Don't show toast for cancelled request
-            } else if (error.code === 'auth/configuration-not-found' || 
-                       error.code === 'auth/unauthorized-domain' || 
-                       error.code === 'auth/operation-not-allowed') {
-                // Show setup instructions with direct links
-                showModal('<div class="setup-instructions"><h3>Setup Required</h3><p>Click the links below to enable social login:</p><div class="setup-steps"><a href="https://console.firebase.google.com/project/bsithub-1974a/authentication/providers" target="_blank" class="setup-link"><i class="fab fa-google"></i> Step 1: Enable Google Provider</a><a href="https://console.firebase.google.com/project/bsithub-1974a/authentication/settings" target="_blank" class="setup-link"><i class="fas fa-globe"></i> Step 2: Add Domain (bsithub.vercel.app)</a></div><p class="setup-note">After completing both steps, click Done and try again.</p><button class="btn btn-primary" onclick="closeModal()">Done</button></div>');
-            } else if (error.code === 'auth/account-exists-with-different-credential') {
-                showToast('Account already exists with different login method', 'error');
-            } else {
-                showToast('Login failed: ' + error.message, 'error');
-            }
-        });
+            .catch(function(error) {
+                window.socialLoginInProgress = false;
+                console.error('Social login error:', error);
+                
+                if (error.code === 'auth/popup-closed-by-user' || error.code === 'auth/cancelled-popup-request') {
+                    // User closed popup - don't show error
+                } else if (error.code === 'auth/configuration-not-found' || 
+                           error.code === 'auth/unauthorized-domain' || 
+                           error.code === 'auth/operation-not-allowed') {
+                    // Show setup instructions based on provider
+                    var providerName = provider.charAt(0).toUpperCase() + provider.slice(1);
+                    var setupHtml = '<div class="setup-instructions">';
+                    setupHtml += '<h3>Enable ' + providerName + ' Login</h3>';
+                    setupHtml += '<p>Click the links below:</p>';
+                    setupHtml += '<div class="setup-steps">';
+                    setupHtml += '<a href="https://console.firebase.google.com/project/bsithub-1974a/authentication/providers" target="_blank" class="setup-link"><i class="fas fa-cog"></i> Step 1: Enable ' + providerName + ' Provider</a>';
+                    setupHtml += '<a href="https://console.firebase.google.com/project/bsithub-1974a/authentication/settings" target="_blank" class="setup-link"><i class="fas fa-globe"></i> Step 2: Add Domain (bsithub.vercel.app)</a>';
+                    setupHtml += '</div>';
+                    
+                    if (provider === 'facebook') {
+                        setupHtml += '<p class="setup-note">Facebook requires a Facebook App ID. <a href="https://developers.facebook.com/" target="_blank">Create one here</a>.</p>';
+                    } else if (provider === 'github') {
+                        setupHtml += '<p class="setup-note">GitHub requires an OAuth App. <a href="https://github.com/settings/developers" target="_blank">Create one here</a>.</p>';
+                    }
+                    
+                    setupHtml += '<p class="setup-note">After completing steps, click Done and try again.</p>';
+                    setupHtml += '<button class="btn btn-primary" onclick="closeModal()">Done</button>';
+                    setupHtml += '</div>';
+                    showModal(setupHtml);
+                } else if (error.code === 'auth/account-exists-with-different-credential') {
+                    showToast('Account already exists with different login method', 'error');
+                } else {
+                    showToast('Login failed: ' + error.message, 'error');
+                }
+            });
     }, 500);
 }
 
