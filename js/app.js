@@ -1809,28 +1809,46 @@ function sendMessage(text) {
 function playSendSound() {
     try {
         var ctx = new (window.AudioContext || window.webkitAudioContext)();
+        
+        // Create a pleasant "swoosh" sound
         var osc = ctx.createOscillator();
         var gain = ctx.createGain();
+        
         osc.connect(gain);
         gain.connect(ctx.destination);
-        osc.frequency.value = 800;
-        gain.gain.value = 0.1;
-        osc.start();
-        osc.stop(ctx.currentTime + 0.1);
+        
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(800, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(1200, ctx.currentTime + 0.08);
+        
+        gain.gain.setValueAtTime(0.15, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
+        
+        osc.start(ctx.currentTime);
+        osc.stop(ctx.currentTime + 0.15);
     } catch(e) {}
 }
 
 function playReceiveSound() {
     try {
         var ctx = new (window.AudioContext || window.webkitAudioContext)();
+        
+        // Create a gentle "ding" sound
         var osc = ctx.createOscillator();
         var gain = ctx.createGain();
+        
         osc.connect(gain);
         gain.connect(ctx.destination);
-        osc.frequency.value = 600;
-        gain.gain.value = 0.1;
-        osc.start();
-        osc.stop(ctx.currentTime + 0.15);
+        
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(523, ctx.currentTime); // C5
+        osc.frequency.setValueAtTime(659, ctx.currentTime + 0.1); // E5
+        
+        gain.gain.setValueAtTime(0.2, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
+        
+        osc.start(ctx.currentTime);
+        osc.stop(ctx.currentTime + 0.3);
     } catch(e) {}
 }
 
