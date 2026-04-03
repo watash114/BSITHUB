@@ -50,9 +50,6 @@ function initFirebase() {
         return false;
     }
 }
-        return false;
-    }
-}
 
 // ==========================================
 // SEND MESSAGE - Simple approach
