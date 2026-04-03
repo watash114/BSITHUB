@@ -4132,3 +4132,107 @@ body {
 .create-group-btn i {
     margin-right: 8px;
 }
+
+/* Voice Call UI */
+.voice-call-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.voice-call-content {
+    text-align: center;
+    color: white;
+}
+
+.call-avatar {
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 48px;
+    margin: 0 auto 20px;
+    animation: pulse-ring 2s infinite;
+}
+
+@keyframes pulse-ring {
+    0% { box-shadow: 0 0 0 0 rgba(255,255,255,0.4); }
+    70% { box-shadow: 0 0 0 30px rgba(255,255,255,0); }
+    100% { box-shadow: 0 0 0 0 rgba(255,255,255,0); }
+}
+
+.voice-call-content h3 {
+    font-size: 28px;
+    margin-bottom: 10px;
+}
+
+.voice-call-content p {
+    font-size: 18px;
+    opacity: 0.9;
+    margin-bottom: 10px;
+}
+
+#call-timer {
+    font-size: 36px;
+    font-weight: 600;
+    font-family: monospace;
+}
+
+.call-actions {
+    display: flex;
+    justify-content: center;
+    gap: 30px;
+    margin-top: 40px;
+}
+
+.call-btn {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+    transition: transform 0.2s, background 0.2s;
+}
+
+.call-btn:hover {
+    transform: scale(1.1);
+}
+
+.call-end {
+    background: #ff4d4d;
+    color: white;
+}
+
+.call-end:hover {
+    background: #e60000;
+}
+
+.call-mute {
+    background: rgba(255,255,255,0.2);
+    color: white;
+}
+
+.call-mute.muted {
+    background: #ff4d4d;
+}
+
+.call-speaker {
+    background: rgba(255,255,255,0.2);
+    color: white;
+}
+
+/* Voice Call Button in Chat Header */
+#voice-call-btn:hover {
+    color: #4CAF50;
+}
