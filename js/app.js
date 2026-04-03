@@ -1044,6 +1044,49 @@ function getFileIcon(fileName) {
     return icons[ext] || 'fa-file';
 }
 
+function showReactionPicker(messageId) {
+    var reactions = ['❤️', '👍', '😂', '😮', '😢', '😡'];
+    var html = '<div class="reaction-picker">';
+    reactions.forEach(function(emoji) {
+        html += '<button class="reaction-option" onclick="addReaction(\'' + messageId + '\', \'' + emoji + '\')">' + emoji + '</button>';
+    });
+    html += '</div>';
+    
+    var messageEl = document.querySelector('[data-message-id="' + messageId + '"]');
+    if (messageEl) {
+        var existingPicker = messageEl.querySelector('.reaction-picker');
+        if (existingPicker) {
+            existingPicker.remove();
+        } else {
+            document.querySelectorAll('.reaction-picker').forEach(function(p) { p.remove(); });
+            var pickerDiv = document.createElement('div');
+            pickerDiv.innerHTML = html;
+            messageEl.querySelector('.message-bubble').appendChild(pickerDiv.firstElementChild);
+        }
+    }
+}
+
+function addReaction(messageId, emoji) {
+    var messages = Storage.get('messages') || [];
+    var message = messages.find(function(m) { return m.id === messageId; });
+    
+    if (message) {
+        if (!message.reactions) message.reactions = {};
+        message.reactions[currentUser.id] = emoji;
+        Storage.set('messages', messages);
+        
+        // Sync to Firebase
+        if (typeof sendMsgToFirebase === 'function') {
+            sendMsgToFirebase(message);
+        }
+        
+        if (activeChat) {
+            renderMessages(activeChat.id);
+        }
+        showToast('Reacted with ' + emoji, 'info');
+    }
+}
+
 function clearReplyPreview() {
     currentReplyTo = null;
     var preview = document.getElementById('reply-preview');
