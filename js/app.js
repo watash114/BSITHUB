@@ -3525,17 +3525,46 @@ function showNewChat() {
         return;
     }
     
-    var html = '<div class="new-chat-modal"><h3>Start New Chat</h3><div class="user-list">';
+    var html = '<div class="new-chat-modal">';
+    html += '<div class="new-chat-header">';
+    html += '<h3><i class="fas fa-comment-dots"></i> New Chat</h3>';
+    html += '</div>';
+    html += '<div class="new-chat-search">';
+    html += '<i class="fas fa-search"></i>';
+    html += '<input type="text" id="search-new-chat" placeholder="Search users..." oninput="filterNewChatUsers(this.value)">';
+    html += '</div>';
+    html += '<div class="new-chat-users">';
     otherUsers.forEach(function(user) {
         var avatar = user.avatar ? '<img src="' + user.avatar + '">' : user.name.charAt(0).toUpperCase();
-        html += '<div class="user-item" onclick="createNewChat(\'' + user.id + '\')">';
-        html += '<div class="user-avatar">' + avatar + '</div>';
-        html += '<div class="user-info"><div class="user-name">' + escapeHtml(user.name) + '</div>';
-        html += '<div class="user-username">@' + escapeHtml(user.username) + '</div></div>';
+        html += '<div class="new-chat-item" onclick="createNewChat(\'' + user.id + '\')" data-user-name="' + user.name.toLowerCase() + '">';
+        html += '<div class="new-chat-avatar">' + avatar + '</div>';
+        html += '<div class="new-chat-info">';
+        html += '<span class="new-chat-name">' + escapeHtml(user.name) + '</span>';
+        html += '<span class="new-chat-username">@' + escapeHtml(user.username) + '</span>';
+        html += '</div>';
+        html += '<i class="fas fa-chevron-right"></i>';
         html += '</div>';
     });
     html += '</div></div>';
     showModal(html);
+    
+    // Focus search input
+    setTimeout(function() {
+        document.getElementById('search-new-chat').focus();
+    }, 100);
+}
+
+function filterNewChatUsers(query) {
+    var items = document.querySelectorAll('.new-chat-item');
+    query = query.toLowerCase();
+    items.forEach(function(item) {
+        var name = item.dataset.userName;
+        if (name.includes(query)) {
+            item.style.display = 'flex';
+        } else {
+            item.style.display = 'none';
+        }
+    });
 }
 
 function createNewChat(userId) {
