@@ -2040,6 +2040,49 @@ function playReceiveSound() {
     } catch(e) {}
 }
 
+function sendFileMessage(file, fileData) {
+    if (!activeChat) return;
+    
+    var messages = Storage.get('messages') || [];
+    var newMessage = {
+        id: generateId(),
+        chatId: activeChat.id,
+        senderId: currentUser.id,
+        senderName: currentUser.name,
+        text: '📎 ' + file.name,
+        fileData: fileData,
+        fileName: file.name,
+        fileType: file.type,
+        timestamp: new Date().toISOString(),
+        read: false,
+        status: 'sent',
+        reactions: {},
+        edited: false,
+        starred: false,
+        replyTo: null,
+        forwarded: false
+    };
+    
+    // Save locally
+    messages.push(newMessage);
+    Storage.set('messages', messages);
+    
+    // Update UI
+    renderMessages(activeChat.id);
+    loadChats();
+    
+    // Send to Firebase
+    if (typeof sendMsgToFirebase === 'function') {
+        sendMsgToFirebase(newMessage).then(function() {
+            newMessage.status = 'delivered';
+            Storage.set('messages', messages);
+            renderMessages(activeChat.id);
+        });
+    }
+    
+    showToast('File sent!', 'success');
+}
+
 function sendGif(gifUrl) {
     var messages = Storage.get('messages') || [];
     var newMessage = {
