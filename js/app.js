@@ -1870,77 +1870,79 @@ function searchGifs(query) {
 
 function populateGifPicker(type) {
     var grid = document.getElementById('gif-grid');
+    grid.innerHTML = '<div class="gif-loading"><i class="fas fa-spinner fa-spin"></i> Loading GIFs...</div>';
     
-    // Simple animated emoji GIFs that don't require external APIs
-    var gifs = [
-        { emoji: '😂', label: 'LOL' },
-        { emoji: '❤️', label: 'Love' },
-        { emoji: '👍', label: 'Thumbs Up' },
-        { emoji: '🎉', label: 'Party' },
-        { emoji: '🔥', label: 'Fire' },
-        { emoji: '😍', label: 'Heart Eyes' },
-        { emoji: '🤣', label: 'Rolling' },
-        { emoji: '😎', label: 'Cool' },
-        { emoji: '🥳', label: 'Celebrate' },
-        { emoji: '😢', label: 'Crying' },
-        { emoji: '😮', label: 'Wow' },
-        { emoji: '🤗', label: 'Hug' },
-        { emoji: '💀', label: 'Dead' },
-        { emoji: '🙄', label: 'Eye Roll' },
-        { emoji: '😴', label: 'Sleepy' },
-        { emoji: '🤯', label: 'Mind Blown' }
-    ];
+    // Use Tenor API for GIFs
+    var apiKey = 'LIVDSRZULELA';
+    var url = 'https://g.tenor.com/v1/trending?key=' + apiKey + '&limit=16&media_filter=minimal';
     
-    grid.innerHTML = '';
-    gifs.forEach(function(gif) {
-        var item = document.createElement('div');
-        item.className = 'gif-item';
-        item.innerHTML = '<span class="gif-emoji">' + gif.emoji + '</span><span class="gif-label">' + gif.label + '</span>';
-        item.onclick = function() {
-            sendGifEmoji(gif.emoji);
-        };
-        grid.appendChild(item);
-    });
+    fetch(url)
+        .then(function(response) { return response.json(); })
+        .then(function(data) {
+            grid.innerHTML = '';
+            if (data.results && data.results.length > 0) {
+                data.results.forEach(function(gif) {
+                    var gifUrl = gif.media[0].tinygif.url;
+                    var item = document.createElement('div');
+                    item.className = 'gif-item';
+                    var img = document.createElement('img');
+                    img.src = gifUrl;
+                    img.alt = 'GIF';
+                    img.loading = 'lazy';
+                    item.appendChild(img);
+                    item.onclick = function() {
+                        sendGif(gifUrl);
+                    };
+                    grid.appendChild(item);
+                });
+            } else {
+                grid.innerHTML = '<div class="gif-no-results">No GIFs available</div>';
+            }
+        })
+        .catch(function(error) {
+            console.error('GIF fetch error:', error);
+            grid.innerHTML = '<div class="gif-no-results">Could not load GIFs</div>';
+        });
 }
 
-function sendGifEmoji(emoji) {
-    var messages = Storage.get('messages') || [];
-    var newMessage = {
-        id: generateId(),
-        chatId: activeChat.id,
-        senderId: currentUser.id,
-        senderName: currentUser.name,
-        text: emoji,
-        isEmoji: true,
-        timestamp: new Date().toISOString(),
-        read: false,
-        status: 'sent',
-        reactions: {},
-        edited: false,
-        starred: false,
-        replyTo: null,
-        forwarded: false
-    };
-    
-    // Save locally
-    messages.push(newMessage);
-    Storage.set('messages', messages);
-    
-    // Update UI
-    document.getElementById('gif-picker').style.display = 'none';
-    renderMessages(activeChat.id);
-    loadChats();
-    
-    // Send to Firebase
-    if (typeof sendMsgToFirebase === 'function') {
-        sendMsgToFirebase(newMessage).then(function() {
-            newMessage.status = 'delivered';
-            Storage.set('messages', messages);
-            renderMessages(activeChat.id);
-        });
+function searchGifs(query) {
+    if (!query.trim()) {
+        populateGifPicker();
+        return;
     }
     
-    showToast('Sent!', 'success');
+    var grid = document.getElementById('gif-grid');
+    grid.innerHTML = '<div class="gif-loading"><i class="fas fa-spinner fa-spin"></i> Searching...</div>';
+    
+    var apiKey = 'LIVDSRZULELA';
+    var url = 'https://g.tenor.com/v1/search?q=' + encodeURIComponent(query) + '&key=' + apiKey + '&limit=16&media_filter=minimal';
+    
+    fetch(url)
+        .then(function(response) { return response.json(); })
+        .then(function(data) {
+            grid.innerHTML = '';
+            if (data.results && data.results.length > 0) {
+                data.results.forEach(function(gif) {
+                    var gifUrl = gif.media[0].tinygif.url;
+                    var item = document.createElement('div');
+                    item.className = 'gif-item';
+                    var img = document.createElement('img');
+                    img.src = gifUrl;
+                    img.alt = 'GIF';
+                    img.loading = 'lazy';
+                    item.appendChild(img);
+                    item.onclick = function() {
+                        sendGif(gifUrl);
+                    };
+                    grid.appendChild(item);
+                });
+            } else {
+                grid.innerHTML = '<div class="gif-no-results">No GIFs found</div>';
+            }
+        })
+        .catch(function(error) {
+            grid.innerHTML = '<div class="gif-no-results">Search failed</div>';
+        });
 }
 
 function sendMessage(text) {
