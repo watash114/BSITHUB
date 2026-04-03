@@ -3636,21 +3636,25 @@ function sendResetCode() {
     // Send email via EmailJS
     if (typeof emailjs !== 'undefined') {
         var templateParams = {
+            email: email,
+            passcode: resetVerificationCode,
             to_email: email,
             to_name: user.name,
             verification_code: resetVerificationCode,
-            app_name: 'BSITHUB'
+            code: resetVerificationCode,
+            name: user.name
         };
         
         emailjs.send('service_32be10s', 'template_600032u', templateParams)
             .then(function(response) {
+                console.log('EmailJS success:', response);
                 showToast('Verification code sent to ' + email, 'success');
                 showVerificationInput(email);
             })
             .catch(function(error) {
                 console.error('EmailJS error:', error);
-                // Fallback: show code on screen for demo
-                showToast('Could not send email. Code shown for demo.', 'info');
+                // Show code on screen as fallback
+                showToast('Email failed. Code shown below.', 'info');
                 showVerificationInput(email, true);
             });
     } else {
