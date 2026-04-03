@@ -3563,3 +3563,88 @@ body {
     border-radius: 10px;
     font-size: 12px;
 }
+
+/* Add Members Modal */
+.add-members-modal {
+    text-align: center;
+}
+
+.add-members-modal h3 {
+    margin-bottom: 15px;
+}
+
+.available-users-list {
+    max-height: 300px;
+    overflow-y: auto;
+    margin: 15px 0;
+}
+
+.available-user {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px;
+    cursor: pointer;
+    border-radius: 8px;
+    transition: background 0.2s;
+}
+
+.available-user:hover {
+    background: var(--bg-secondary);
+}
+
+.user-avatar-small {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--primary);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    font-size: 14px;
+    overflow: hidden;
+}
+
+.user-avatar-small img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.user-details {
+    flex: 1;
+    text-align: left;
+}
+
+.user-details .user-name {
+    display: block;
+    font-weight: 500;
+}
+
+.user-details .user-username {
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.add-icon {
+    color: var(--primary);
+    font-size: 20px;
+}
+
+/* You Badge */
+.you-badge {
+    background: var(--text-secondary);
+    color: white;
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 8px;
+    margin-left: 5px;
+}
+
+/* Group Info */
+.group-info .btn-primary {
+    margin-bottom: 15px;
+    width: 100%;
+}

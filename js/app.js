@@ -1897,11 +1897,30 @@ function showGroupInfo() {
     
     var html = '<div class="group-info"><h3>' + escapeHtml(chat.groupName || 'Group') + '</h3>';
     html += '<p>' + chat.participants.length + ' members</p>';
+    
+    // Add Members button (only for admin)
+    if (isAdmin) {
+        html += '<button class="btn btn-primary" onclick="showAddMembers()"><i class="fas fa-user-plus"></i> Add Members</button>';
+    }
+    
     html += '<div class="group-members-list">';
     
     chat.participants.forEach(function(userId) {
         var user = users.find(function(u) { return u.id === userId; });
-        if (!user) return;
+        if (!user) {
+            // Try to fetch from Firebase
+            if (typeof fetchUserFromFirebase === 'function') {
+                fetchUserFromFirebase(userId);
+            }
+            html += '<div class="group-member">';
+            html += '<div class="member-avatar">?</div>';
+            html += '<div class="member-info">';
+            html += '<span class="member-name">' + userId.substring(0, 8) + '</span>';
+            html += '<span class="member-username">@unknown</span>';
+            html += '</div>';
+            html += '</div>';
+            return;
+        }
         
         var avatar = user.avatar ? '<img src="' + user.avatar + '">' : user.name.charAt(0).toUpperCase();
         var isGroupAdmin = chat.admin === userId;
@@ -1911,13 +1930,14 @@ function showGroupInfo() {
         html += '<div class="member-info">';
         html += '<span class="member-name">' + escapeHtml(user.name);
         if (isGroupAdmin) html += ' <span class="admin-badge">Admin</span>';
+        if (userId === currentUser.id) html += ' <span class="you-badge">You</span>';
         html += '</span>';
         html += '<span class="member-username">@' + escapeHtml(user.username) + '</span>';
         html += '</div>';
         
         // Kick button (only admin can kick, can't kick yourself or other admins)
         if (isAdmin && userId !== currentUser.id && !isGroupAdmin) {
-            html += '<button class="btn btn-small danger" onclick="kickMember(\'' + userId + '\')">Kick</button>';
+            html += '<button class="btn btn-small danger" onclick="kickMember(\'' + userId + '\')"><i class="fas fa-user-minus"></i> Kick</button>';
         }
         
         html += '</div>';
@@ -1927,6 +1947,80 @@ function showGroupInfo() {
     html += '<button class="btn" onclick="closeModal()">Close</button>';
     html += '</div>';
     showModal(html);
+}
+
+function showAddMembers() {
+    if (!activeChat) return;
+    
+    var chats = Storage.get('chats') || [];
+    var chat = chats.find(function(c) { return c.id === activeChat.id; });
+    if (!chat || !chat.isGroup) return;
+    
+    var users = Storage.get('users') || [];
+    
+    // Filter out users already in the group
+    var availableUsers = users.filter(function(u) {
+        return chat.participants.indexOf(u.id) === -1 && u.id !== currentUser.id;
+    });
+    
+    if (availableUsers.length === 0) {
+        showToast('No users available to add', 'info');
+        return;
+    }
+    
+    var html = '<div class="add-members-modal"><h3>Add Members</h3>';
+    html += '<div class="available-users-list">';
+    
+    availableUsers.forEach(function(user) {
+        var avatar = user.avatar ? '<img src="' + user.avatar + '">' : user.name.charAt(0).toUpperCase();
+        html += '<div class="available-user" onclick="addMemberToGroup(\'' + user.id + '\')">';
+        html += '<div class="user-avatar-small">' + avatar + '</div>';
+        html += '<div class="user-details">';
+        html += '<span class="user-name">' + escapeHtml(user.name) + '</span>';
+        html += '<span class="user-username">@' + escapeHtml(user.username) + '</span>';
+        html += '</div>';
+        html += '<i class="fas fa-plus-circle add-icon"></i>';
+        html += '</div>';
+    });
+    
+    html += '</div>';
+    html += '<button class="btn" onclick="showGroupInfo()">Back</button>';
+    html += '</div>';
+    showModal(html);
+}
+
+function addMemberToGroup(userId) {
+    if (!activeChat) return;
+    
+    var chats = Storage.get('chats') || [];
+    var chatIndex = chats.findIndex(function(c) { return c.id === activeChat.id; });
+    if (chatIndex === -1) return;
+    
+    var chat = chats[chatIndex];
+    if (!chat.isGroup || chat.admin !== currentUser.id) {
+        showToast('Only admin can add members', 'error');
+        return;
+    }
+    
+    if (chat.participants.indexOf(userId) !== -1) {
+        showToast('User already in group', 'info');
+        return;
+    }
+    
+    // Add member to participants
+    chat.participants.push(userId);
+    chats[chatIndex] = chat;
+    Storage.set('chats', chats);
+    
+    // Sync to Firebase
+    if (typeof syncChat === 'function') {
+        syncChat(chat);
+    }
+    
+    showToast('Member added!', 'success');
+    
+    // Refresh group info
+    showGroupInfo();
 }
 
 function kickMember(userId) {
