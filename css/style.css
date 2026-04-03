@@ -1092,6 +1092,8 @@ body {
     font-size: 14px;
     line-height: 1.5;
     word-wrap: break-word;
+    white-space: normal;
+    overflow-wrap: break-word;
 }
 
 .message-text .mention {
