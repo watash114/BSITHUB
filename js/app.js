@@ -3936,19 +3936,24 @@ function showTermsOfService() {
 }
 
 // ==========================================
-// Video Calling (VideoSDK.live)
+// Video Calling (WebRTC + Firebase)
 // ==========================================
-var meeting = null;
+var peerConnection = null;
 var localStream = null;
 var isVideoCallActive = false;
 var callTimer = null;
 var callSeconds = 0;
 var isMuted = false;
 var isCameraOff = false;
+var currentCallId = null;
 
-// TODO: Replace with your VideoSDK API key
-var VIDEOSDK_API_KEY = '89a01300-acc4-4b67-a96d-cca215bacbe7';
-var VIDEOSDK_SECRET = '347924b5eabb89915df92f8fef9a24206814382d9e6c71ad2aab993eef507be5';
+var iceServers = {
+    iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' },
+        { urls: 'stun:stun2.l.google.com:19302' }
+    ]
+};
 
 function startVideoCall() {
     if (!activeChat) {
@@ -3961,91 +3966,91 @@ function startVideoCall() {
         return;
     }
     
-    showModal('<div class="video-call-setup"><h3><i class="fas fa-video"></i> Start Video Call</h3><p>Enter your VideoSDK API key to start</p><div class="forgot-input"><i class="fas fa-key"></i><input type="text" id="videosdk-key" placeholder="Enter API Key" value="' + VIDEOSDK_API_KEY + '"></div><a href="https://app.videosdk.live/api-keys" target="_blank" style="display:block;margin:10px 0;font-size:13px;">Get free API key</a><button class="btn btn-primary" onclick="initVideoCall()"><i class="fas fa-phone"></i> Start Call</button><button class="btn" onclick="closeModal()">Cancel</button></div>');
+    // Show options modal
+    showModal('<div class="video-call-setup"><h3><i class="fas fa-video"></i> Video Call</h3><p>Start a new call or join an existing one</p><button class="btn btn-primary" onclick="initVideoCall()"><i class="fas fa-phone"></i> Start New Call</button><button class="btn" onclick="showJoinCallModal()"><i class="fas fa-sign-in-alt"></i> Join with Meeting ID</button><button class="btn" onclick="closeModal()">Cancel</button></div>');
 }
 
 async function initVideoCall() {
-    var apiKey = document.getElementById('videosdk-key').value;
-    if (!apiKey || apiKey === 'YOUR_VIDEOSDK_API_KEY') {
-        showToast('Please enter a valid API key', 'error');
-        return;
-    }
-    
-    VIDEOSDK_API_KEY = apiKey;
     closeModal();
     
     try {
-        // Check if VideoSDK is loaded, if not load it dynamically
-        if (typeof VideoSDK === 'undefined') {
-            showToast('Loading VideoSDK...', 'info');
-            await new Promise(function(resolve, reject) {
-                var script = document.createElement('script');
-                script.src = 'https://unpkg.com/@videosdk.live/js-sdk@0.1.83/dist/videosdk.live.js';
-                script.onload = resolve;
-                script.onerror = reject;
-                document.head.appendChild(script);
-            });
-            // Wait a bit for SDK to initialize
-            await new Promise(function(r) { setTimeout(r, 2000); });
-        }
-        
-        // Check again
-        if (typeof VideoSDK === 'undefined') {
-            showToast('VideoSDK not available. Please refresh.', 'error');
-            return;
-        }
-        
-        // Initialize VideoSDK
-        VideoSDK.config(apiKey);
-        
-        // Generate unique meeting ID
-        var meetingId = 'bsithub-' + activeChat.id + '-' + Date.now();
-        
-        // Create meeting
-        meeting = await VideoSDK.initMeeting({
-            meetingId: meetingId,
-            name: currentUser.name,
-            micEnabled: true,
-            webcamEnabled: true
+        // Get camera and microphone
+        localStream = await navigator.mediaDevices.getUserMedia({ 
+            video: { width: 640, height: 480 }, 
+            audio: true 
         });
         
-        // Join meeting
-        await meeting.join();
+        // Generate call ID
+        currentCallId = activeChat.id + '-call-' + Date.now();
+        
+        // Create peer connection
+        peerConnection = new RTCPeerConnection(iceServers);
+        
+        // Add local stream
+        localStream.getTracks().forEach(function(track) {
+            peerConnection.addTrack(track, localStream);
+        });
+        
+        // Handle remote stream
+        peerConnection.ontrack = function(event) {
+            console.log('Got remote stream');
+            var remoteVideo = document.getElementById('remote-video-element');
+            if (remoteVideo && event.streams[0]) {
+                remoteVideo.srcObject = event.streams[0];
+            }
+        };
+        
+        // Handle ICE candidates
+        peerConnection.onicecandidate = function(event) {
+            if (event.candidate && firebaseDb) {
+                firebaseDb.ref('calls/' + currentCallId + '/candidates/' + currentUser.id).push(event.candidate.toJSON());
+            }
+        };
+        
+        // Create offer
+        var offer = await peerConnection.createOffer();
+        await peerConnection.setLocalDescription(offer);
+        
+        // Store offer in Firebase
+        if (firebaseDb) {
+            await firebaseDb.ref('calls/' + currentCallId).set({
+                offer: offer,
+                caller: currentUser.id,
+                callerName: currentUser.name,
+                chatId: activeChat.id,
+                timestamp: firebase.database.ServerValue.TIMESTAMP
+            });
+            
+            // Listen for answer
+            firebaseDb.ref('calls/' + currentCallId + '/answer').on('value', async function(snapshot) {
+                var answer = snapshot.val();
+                if (answer && peerConnection) {
+                    console.log('Got answer');
+                    await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
+                }
+            });
+            
+            // Listen for remote ICE candidates
+            firebaseDb.ref('calls/' + currentCallId + '/candidates').on('child_added', function(snapshot) {
+                if (snapshot.key !== currentUser.id) {
+                    snapshot.forEach(function(child) {
+                        var candidate = child.val();
+                        if (candidate && peerConnection) {
+                            peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+                        }
+                    });
+                }
+            });
+        }
         
         // Show video UI
         showVideoCallUI();
         
-        // Handle local stream
-        meeting.localParticipant.on("stream-enabled", function(stream) {
-            if (stream.kind === "video") {
-                var localVideo = document.getElementById('local-video-element');
-                if (localVideo) {
-                    localVideo.srcObject = stream.mediaStream;
-                }
-            }
-        });
-        
-        // Handle remote participants
-        meeting.on("participant-joined", function(participant) {
-            console.log('Participant joined:', participant.displayName);
-            participant.on("stream-enabled", function(stream) {
-                if (stream.kind === "video") {
-                    addRemoteParticipant(participant.id, participant.displayName, stream.mediaStream);
-                }
-            });
-            participant.on("stream-disabled", function(stream) {
-                if (stream.kind === "video") {
-                    removeRemoteParticipant(participant.id);
-                }
-            });
-            updateCallStatus();
-        });
-        
-        meeting.on("participant-left", function(participant) {
-            console.log('Participant left:', participant.displayName);
-            removeRemoteParticipant(participant.id);
-            updateCallStatus();
-        });
+        // Attach local video
+        var localVideo = document.getElementById('local-video-element');
+        if (localVideo) {
+            localVideo.srcObject = localStream;
+        }
         
         // Start timer
         callSeconds = 0;
@@ -4058,29 +4063,139 @@ async function initVideoCall() {
         }, 1000);
         
         isVideoCallActive = true;
-        document.getElementById('call-status').textContent = 'Connected - Share meeting ID: ' + meetingId;
-        showToast('Video call started!', 'success');
+        document.getElementById('call-status').textContent = 'Waiting for other person to join...';
+        document.getElementById('call-id-display').textContent = 'Meeting ID: ' + currentCallId;
+        showToast('Call started! Share the Meeting ID.', 'success');
         
     } catch (error) {
         console.error('Video call error:', error);
-        showToast('Could not start video: ' + error.message, 'error');
+        showToast('Camera error: ' + error.message, 'error');
     }
+}
+
+async function joinCall() {
+    var callId = document.getElementById('join-call-id').value;
+    if (!callId) {
+        showToast('Please enter a Meeting ID', 'error');
+        return;
+    }
+    
+    closeModal();
+    
+    try {
+        // Get camera and microphone
+        localStream = await navigator.mediaDevices.getUserMedia({ 
+            video: { width: 640, height: 480 }, 
+            audio: true 
+        });
+        
+        currentCallId = callId;
+        
+        // Create peer connection
+        peerConnection = new RTCPeerConnection(iceServers);
+        
+        // Add local stream
+        localStream.getTracks().forEach(function(track) {
+            peerConnection.addTrack(track, localStream);
+        });
+        
+        // Handle remote stream
+        peerConnection.ontrack = function(event) {
+            console.log('Got remote stream');
+            var remoteVideo = document.getElementById('remote-video-element');
+            if (remoteVideo && event.streams[0]) {
+                remoteVideo.srcObject = event.streams[0];
+            }
+        };
+        
+        // Handle ICE candidates
+        peerConnection.onicecandidate = function(event) {
+            if (event.candidate && firebaseDb) {
+                firebaseDb.ref('calls/' + currentCallId + '/candidates/' + currentUser.id).push(event.candidate.toJSON());
+            }
+        };
+        
+        // Get offer from Firebase
+        if (firebaseDb) {
+            var snapshot = await firebaseDb.ref('calls/' + currentCallId + '/offer').once('value');
+            var offer = snapshot.val();
+            
+            if (offer) {
+                await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
+                
+                // Create answer
+                var answer = await peerConnection.createAnswer();
+                await peerConnection.setLocalDescription(answer);
+                
+                // Store answer in Firebase
+                await firebaseDb.ref('calls/' + currentCallId + '/answer').set(answer);
+                
+                // Listen for remote ICE candidates
+                firebaseDb.ref('calls/' + currentCallId + '/candidates').on('child_added', function(snapshot) {
+                    if (snapshot.key !== currentUser.id) {
+                        snapshot.forEach(function(child) {
+                            var candidate = child.val();
+                            if (candidate && peerConnection) {
+                                peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+                            }
+                        });
+                    }
+                });
+            } else {
+                showToast('Call not found', 'error');
+                return;
+            }
+        }
+        
+        // Show video UI
+        showVideoCallUI();
+        
+        // Attach local video
+        var localVideo = document.getElementById('local-video-element');
+        if (localVideo) {
+            localVideo.srcObject = localStream;
+        }
+        
+        // Start timer
+        callSeconds = 0;
+        callTimer = setInterval(function() {
+            callSeconds++;
+            var mins = Math.floor(callSeconds / 60).toString().padStart(2, '0');
+            var secs = (callSeconds % 60).toString().padStart(2, '0');
+            var timer = document.getElementById('call-timer');
+            if (timer) timer.textContent = mins + ':' + secs;
+        }, 1000);
+        
+        isVideoCallActive = true;
+        document.getElementById('call-status').textContent = 'Connected';
+        showToast('Joined call!', 'success');
+        
+    } catch (error) {
+        console.error('Join call error:', error);
+        showToast('Error joining: ' + error.message, 'error');
+    }
+}
+
+function showJoinCallModal() {
+    showModal('<div class="video-call-setup"><h3><i class="fas fa-video"></i> Join Video Call</h3><p>Enter the Meeting ID to join</p><div class="forgot-input"><i class="fas fa-key"></i><input type="text" id="join-call-id" placeholder="Enter Meeting ID"></div><button class="btn btn-primary" onclick="joinCall()"><i class="fas fa-sign-in-alt"></i> Join Call</button><button class="btn" onclick="closeModal()">Cancel</button></div>');
 }
 
 function showVideoCallUI() {
     var html = '<div class="video-call-overlay" id="video-call-overlay">';
     html += '<div class="video-call-content">';
-    html += '<div class="video-grid" id="video-grid">';
+    html += '<div class="video-grid">';
     html += '<div class="video-participant local">';
     html += '<video id="local-video-element" autoplay muted playsinline></video>';
     html += '<span class="participant-name">' + currentUser.name + ' (You)</span>';
     html += '</div>';
-    html += '<div class="video-participant remote" id="remote-placeholder">';
-    html += '<div class="remote-placeholder"><i class="fas fa-user"></i><span>Waiting for others...</span></div>';
+    html += '<div class="video-participant remote">';
+    html += '<video id="remote-video-element" autoplay playsinline></video>';
+    html += '<div class="remote-placeholder" id="remote-placeholder"><i class="fas fa-user"></i><span>Waiting for other person...</span></div>';
     html += '</div>';
     html += '</div>';
     html += '<div class="call-info">';
     html += '<p id="call-status">Connecting...</p>';
+    html += '<p id="call-id-display" style="font-size:12px;cursor:pointer;" onclick="copyCallId()">Click to copy Meeting ID</p>';
     html += '<p id="call-timer">00:00</p>';
     html += '</div>';
     html += '<div class="call-controls">';
@@ -4092,79 +4207,51 @@ function showVideoCallUI() {
     document.body.insertAdjacentHTML('beforeend', html);
 }
 
-function addRemoteParticipant(participantId, name, stream) {
-    var grid = document.getElementById('video-grid');
-    if (!grid) return;
-    
-    // Remove placeholder
-    var placeholder = document.getElementById('remote-placeholder');
-    if (placeholder) placeholder.remove();
-    
-    // Check if already exists
-    var existing = document.getElementById('remote-' + participantId);
-    if (existing) {
-        var video = existing.querySelector('video');
-        if (video) video.srcObject = stream;
-        return;
-    }
-    
-    var div = document.createElement('div');
-    div.className = 'video-participant remote';
-    div.id = 'remote-' + participantId;
-    div.innerHTML = '<video autoplay playsinline></video><span class="participant-name">' + name + '</span>';
-    grid.appendChild(div);
-    
-    var video = div.querySelector('video');
-    if (video) video.srcObject = stream;
-}
-
-function removeRemoteParticipant(participantId) {
-    var el = document.getElementById('remote-' + participantId);
-    if (el) el.remove();
-}
-
-function updateCallStatus() {
-    var statusEl = document.getElementById('call-status');
-    if (statusEl && meeting) {
-        var count = Object.keys(meeting.participants).length;
-        statusEl.textContent = count + ' participant(s)';
+function copyCallId() {
+    if (currentCallId) {
+        navigator.clipboard.writeText(currentCallId);
+        showToast('Meeting ID copied!', 'success');
     }
 }
 
 function toggleMic() {
-    if (!meeting) return;
-    
-    if (isMuted) {
-        meeting.unmuteMic();
-        isMuted = false;
-    } else {
-        meeting.muteMic();
-        isMuted = true;
+    if (!localStream) return;
+    var audioTrack = localStream.getAudioTracks()[0];
+    if (audioTrack) {
+        audioTrack.enabled = !audioTrack.enabled;
+        isMuted = !audioTrack.enabled;
+        var btn = document.getElementById('toggle-mic');
+        btn.classList.toggle('disabled', isMuted);
     }
-    
-    var btn = document.getElementById('toggle-mic');
-    btn.classList.toggle('disabled', isMuted);
 }
 
 function toggleCamera() {
-    if (!meeting) return;
-    
-    if (isCameraOff) {
-        meeting.enableWebcam();
-        isCameraOff = false;
-    } else {
-        meeting.disableWebcam();
-        isCameraOff = true;
+    if (!localStream) return;
+    var videoTrack = localStream.getVideoTracks()[0];
+    if (videoTrack) {
+        videoTrack.enabled = !videoTrack.enabled;
+        isCameraOff = !videoTrack.enabled;
+        var btn = document.getElementById('toggle-camera');
+        btn.classList.toggle('disabled', isCameraOff);
     }
-    
-    var btn = document.getElementById('toggle-camera');
-    btn.classList.toggle('disabled', isCameraOff);
 }
 
 function endVideoCall() {
-    if (meeting) {
-        meeting.leave();
-        meeting = null;
+    // Stop tracks
+    if (localStream) {
+        localStream.getTracks().forEach(function(track) { track.stop(); });
+        localStream = null;
+    }
+    
+    // Close peer connection
+    if (peerConnection) {
+        peerConnection.close();
+        peerConnection = null;
+    }
+    
+    // Clean up Firebase
+    if (firebaseDb && currentCallId) {
+        firebaseDb.ref('calls/' + currentCallId).remove();
     }
     
     if (callTimer) {
@@ -4176,6 +4263,7 @@ function endVideoCall() {
     isMuted = false;
     isCameraOff = false;
     callSeconds = 0;
+    currentCallId = null;
     
     var overlay = document.getElementById('video-call-overlay');
     if (overlay) overlay.remove();
