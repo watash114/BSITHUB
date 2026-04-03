@@ -927,6 +927,197 @@ function openChat(chatId, userId) {
 }
 
 // ==========================================
+// Render Messages
+// ==========================================
+function renderMessages(chatId) {
+    var messages = Storage.get('messages') || [];
+    var users = Storage.get('users') || [];
+    var messagesContainer = document.getElementById('chat-messages');
+    if (!messagesContainer) return;
+    
+    var chatMessages = messages.filter(function(m) { return m.chatId === chatId; });
+    
+    // Mark as read
+    chatMessages.forEach(function(msg) {
+        if (!msg.read && msg.senderId !== currentUser.id) {
+            msg.read = true;
+            msg.status = 'read';
+        }
+    });
+    Storage.set('messages', messages);
+    
+    var html = '';
+    chatMessages.forEach(function(msg) {
+        var isSent = msg.senderId === currentUser.id;
+        html += '<div class="message ' + (isSent ? 'sent' : 'received') + '" data-message-id="' + msg.id + '">';
+        html += '<div class="message-bubble">';
+        
+        // Check for GIF
+        if (msg.gifUrl) {
+            html += '<div class="message-gif"><img src="' + msg.gifUrl + '" alt="GIF" class="gif-image"></div>';
+        }
+        // Check for image
+        else if (msg.fileData && msg.fileType && msg.fileType.startsWith('image/')) {
+            html += '<div class="message-media"><img src="' + msg.fileData + '" alt="Image" onclick="viewImage(this.src)"></div>';
+        }
+        // Check for video
+        else if (msg.fileData && msg.fileType && msg.fileType.startsWith('video/')) {
+            html += '<div class="message-video"><video controls src="' + msg.fileData + '"></video></div>';
+        }
+        // Check for audio
+        else if (msg.fileData && msg.fileType && msg.fileType.startsWith('audio/')) {
+            html += '<div class="message-audio"><audio controls src="' + msg.fileData + '"></audio></div>';
+        }
+        // Check for file
+        else if (msg.fileData) {
+            var fileIcon = getFileIcon(msg.fileName || '');
+            html += '<div class="message-file">';
+            html += '<a href="' + msg.fileData + '" download="' + (msg.fileName || 'file') + '">';
+            html += '<i class="fas ' + fileIcon + '"></i>';
+            html += '<span class="file-name">' + escapeHtml(msg.fileName || 'file') + '</span>';
+            html += '</a></div>';
+        }
+        // Regular text
+        else {
+            html += '<div class="message-text">' + escapeHtml(msg.text) + '</div>';
+        }
+        
+        // Reactions
+        if (msg.reactions && Object.keys(msg.reactions).length > 0) {
+            html += '<div class="message-reactions">';
+            var reactionCounts = {};
+            Object.values(msg.reactions).forEach(function(emoji) {
+                reactionCounts[emoji] = (reactionCounts[emoji] || 0) + 1;
+            });
+            Object.entries(reactionCounts).forEach(function(entry) {
+                html += '<span class="reaction-badge">' + entry[0] + ' ' + entry[1] + '</span>';
+            });
+            html += '</div>';
+        }
+        
+        html += '<div class="message-footer">';
+        html += '<span class="message-time">' + formatTime(msg.timestamp) + '</span>';
+        if (isSent) {
+            var statusClass = msg.status === 'read' ? ' read' : '';
+            html += '<span class="message-status' + statusClass + '">' + (msg.status === 'read' ? '✓✓' : '✓') + '</span>';
+        }
+        html += '</div>';
+        
+        // Action buttons
+        html += '<div class="message-actions">';
+        html += '<button class="message-action-btn" onclick="showReactionPicker(\'' + msg.id + '\')" title="React">😀</button>';
+        html += '</div>';
+        html += '</div>';
+        html += '</div>';
+    });
+    
+    messagesContainer.innerHTML = html;
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+}
+
+function viewImage(src) {
+    showModal('<div class="image-viewer"><img src="' + src + '" style="max-width:100%;max-height:80vh;"></div>');
+}
+
+function getFileIcon(fileName) {
+    var ext = fileName.split('.').pop().toLowerCase();
+    var icons = {
+        'pdf': 'fa-file-pdf',
+        'doc': 'fa-file-word',
+        'docx': 'fa-file-word',
+        'xls': 'fa-file-excel',
+        'xlsx': 'fa-file-excel',
+        'ppt': 'fa-file-powerpoint',
+        'pptx': 'fa-file-powerpoint',
+        'zip': 'fa-file-archive',
+        'rar': 'fa-file-archive',
+        'txt': 'fa-file-alt',
+        'jpg': 'fa-file-image',
+        'jpeg': 'fa-file-image',
+        'png': 'fa-file-image',
+        'gif': 'fa-file-image',
+        'mp3': 'fa-file-audio',
+        'wav': 'fa-file-audio',
+        'mp4': 'fa-file-video',
+        'avi': 'fa-file-video'
+    };
+    return icons[ext] || 'fa-file';
+}
+
+function clearReplyPreview() {
+    currentReplyTo = null;
+    var preview = document.getElementById('reply-preview');
+    if (preview) preview.style.display = 'none';
+}
+
+function handleMentionInput(input) {
+    var text = input.value;
+    var cursorPos = input.selectionStart;
+    var textBeforeCursor = text.substring(0, cursorPos);
+    var mentionMatch = textBeforeCursor.match(/@(\w*)$/);
+    
+    if (mentionMatch) {
+        var query = mentionMatch[1];
+        var users = Storage.get('users') || [];
+        var filteredUsers = users.filter(function(u) {
+            return u.id !== currentUser.id && 
+                   (u.username.toLowerCase().startsWith(query.toLowerCase()) ||
+                    u.name.toLowerCase().startsWith(query.toLowerCase()));
+        }).slice(0, 5);
+        
+        if (filteredUsers.length > 0) {
+            showMentionsDropdown(filteredUsers, mentionMatch[0].length);
+        } else {
+            hideMentionsDropdown();
+        }
+    } else {
+        hideMentionsDropdown();
+    }
+}
+
+function showMentionsDropdown(users, mentionLength) {
+    var dropdown = document.getElementById('mentions-dropdown');
+    var input = document.getElementById('message-input');
+    if (!dropdown || !input) return;
+    
+    var html = '';
+    users.forEach(function(user) {
+        html += '<div class="mention-item" onclick="selectMention(\'' + user.username + '\', ' + mentionLength + ')">';
+        html += '<span class="mention-name">' + user.name + '</span>';
+        html += '<span class="mention-username">@' + user.username + '</span>';
+        html += '</div>';
+    });
+    
+    dropdown.innerHTML = html;
+    dropdown.style.display = 'block';
+}
+
+function selectMention(username, mentionLength) {
+    var input = document.getElementById('message-input');
+    if (!input) return;
+    
+    var text = input.value;
+    var cursorPos = input.selectionStart;
+    var textBeforeCursor = text.substring(0, cursorPos);
+    var atIndex = textBeforeCursor.lastIndexOf('@');
+    
+    if (atIndex !== -1) {
+        var newText = text.substring(0, atIndex) + '@' + username + ' ' + text.substring(cursorPos);
+        input.value = newText;
+        var newCursorPos = atIndex + username.length + 2;
+        input.setSelectionRange(newCursorPos, newCursorPos);
+    }
+    
+    hideMentionsDropdown();
+    input.focus();
+}
+
+function hideMentionsDropdown() {
+    var dropdown = document.getElementById('mentions-dropdown');
+    if (dropdown) dropdown.style.display = 'none';
+}
+
+// ==========================================
 // File & Media Functions
 // ==========================================
 // Profile
