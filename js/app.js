@@ -1873,6 +1873,7 @@ function showChatOptions() {
     // Show group info option for groups
     if (chat && chat.isGroup) {
         html += '<button class="btn" onclick="showGroupInfo()"><i class="fas fa-users"></i> Group Info</button>';
+        html += '<button class="btn danger" onclick="leaveGroup()"><i class="fas fa-sign-out-alt"></i> Leave Group</button>';
     }
     
     html += '<button class="btn" onclick="toggleMuteChat()"><i class="fas fa-bell"></i> ' + (chat && chat.muted ? 'Unmute' : 'Mute') + ' Notifications</button>';
@@ -1883,6 +1884,60 @@ function showChatOptions() {
     html += '<button class="btn danger" onclick="deleteChat()"><i class="fas fa-trash"></i> Delete Chat</button>';
     html += '</div>';
     showModal(html);
+}
+
+function leaveGroup() {
+    if (!activeChat) return;
+    
+    var chats = Storage.get('chats') || [];
+    var chat = chats.find(function(c) { return c.id === activeChat.id; });
+    if (!chat || !chat.isGroup) {
+        showToast('Not a group chat', 'error');
+        return;
+    }
+    
+    showModal('<div class="leave-group-confirm"><h3>Leave Group?</h3><p>You will no longer receive messages from this group.</p><div class="modal-buttons"><button class="btn" onclick="closeModal()">Cancel</button><button class="btn danger" onclick="confirmLeaveGroup()">Leave Group</button></div></div>');
+}
+
+function confirmLeaveGroup() {
+    if (!activeChat) return;
+    
+    var chats = Storage.get('chats') || [];
+    var chatIndex = chats.findIndex(function(c) { return c.id === activeChat.id; });
+    if (chatIndex === -1) return;
+    
+    var chat = chats[chatIndex];
+    
+    // Remove current user from participants
+    chat.participants = chat.participants.filter(function(id) { return id !== currentUser.id; });
+    
+    // If no participants left, delete the chat entirely
+    if (chat.participants.length === 0) {
+        chats.splice(chatIndex, 1);
+    } else {
+        // If admin left, make first remaining participant the admin
+        if (chat.admin === currentUser.id) {
+            chat.admin = chat.participants[0];
+        }
+        chats[chatIndex] = chat;
+    }
+    
+    Storage.set('chats', chats);
+    
+    // Sync to Firebase
+    if (typeof syncChat === 'function' && chat.participants.length > 0) {
+        syncChat(chat);
+    }
+    
+    // Clear active chat
+    activeChat = null;
+    document.getElementById('chat-placeholder').style.display = 'block';
+    document.getElementById('chat-active').style.display = 'none';
+    
+    closeModal();
+    loadChats();
+    loadGroups();
+    showToast('You left the group', 'success');
 }
 
 function showGroupInfo() {
