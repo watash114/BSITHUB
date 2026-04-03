@@ -650,7 +650,6 @@ function initNavigation() {
             document.getElementById(section + '-section').classList.add('active');
             
             if (section === 'chats') loadChats();
-            if (section === 'groups') loadGroups();
             if (section === 'profile') loadProfile();
             if (section === 'admin') loadAdminData();
         };
@@ -662,6 +661,8 @@ function initNavigation() {
 // ==========================================
 function loadGroups() {
     var groupsContainer = document.getElementById('groups-container');
+    if (!groupsContainer) return; // Groups section removed
+    
     var chats = Storage.get('chats') || [];
     var myGroups = chats.filter(function(c) { return c.participants.indexOf(currentUser.id) !== -1 && c.isGroup; });
     
