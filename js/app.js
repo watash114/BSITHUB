@@ -3936,21 +3936,143 @@ function showTermsOfService() {
 }
 
 // ==========================================
-// Video Calling (Stream API)
+// Video Calling (Simple WebRTC)
 // ==========================================
-var streamClient = null;
-var activeCall = null;
+var videoStream = null;
 var isVideoCallActive = false;
-
-// TODO: Replace with your Stream API credentials
-var STREAM_API_KEY = '4jqs69zq736j';
-var STREAM_API_SECRET = 'nuay2t8ychkd4rxdynqcutcz793bvsabntc5hzr86qrrca94hntjrgjjb3f9gj6t';
+var callTimer = null;
+var callSeconds = 0;
 
 function startVideoCall() {
     if (!activeChat) {
         showToast('Select a chat first', 'info');
         return;
     }
+    
+    if (isVideoCallActive) {
+        showToast('Already in a call', 'info');
+        return;
+    }
+    
+    // Show confirmation modal
+    showModal('<div class="video-call-setup"><h3><i class="fas fa-video"></i> Start Video Call</h3><p>Camera and microphone access required</p><button class="btn btn-primary" onclick="initVideoCall()"><i class="fas fa-phone"></i> Start Call</button><button class="btn" onclick="closeModal()">Cancel</button></div>');
+}
+
+async function initVideoCall() {
+    closeModal();
+    
+    try {
+        // Get camera and microphone
+        videoStream = await navigator.mediaDevices.getUserMedia({ 
+            video: true, 
+            audio: true 
+        });
+        
+        // Show video call UI
+        showVideoCallUI();
+        
+        // Attach local video
+        var localVideo = document.getElementById('local-video-element');
+        if (localVideo) {
+            localVideo.srcObject = videoStream;
+        }
+        
+        isVideoCallActive = true;
+        
+        // Start call timer
+        callSeconds = 0;
+        callTimer = setInterval(function() {
+            callSeconds++;
+            var mins = Math.floor(callSeconds / 60).toString().padStart(2, '0');
+            var secs = (callSeconds % 60).toString().padStart(2, '0');
+            var timer = document.getElementById('call-timer');
+            if (timer) timer.textContent = mins + ':' + secs;
+        }, 1000);
+        
+        document.getElementById('call-status').textContent = 'Connected';
+        showToast('Video call started', 'success');
+        
+    } catch (error) {
+        console.error('Video call error:', error);
+        if (error.name === 'NotAllowedError') {
+            showToast('Camera/microphone access denied', 'error');
+        } else if (error.name === 'NotFoundError') {
+            showToast('No camera/microphone found', 'error');
+        } else {
+            showToast('Could not start video: ' + error.message, 'error');
+        }
+    }
+}
+
+function showVideoCallUI() {
+    var html = '<div class="video-call-overlay" id="video-call-overlay">';
+    html += '<div class="video-call-content">';
+    html += '<div class="video-grid">';
+    html += '<div class="video-participant local">';
+    html += '<video id="local-video-element" autoplay muted playsinline></video>';
+    html += '<span class="participant-name">' + currentUser.name + ' (You)</span>';
+    html += '</div>';
+    html += '<div class="video-participant remote">';
+    html += '<div class="remote-placeholder"><i class="fas fa-user"></i><span>Waiting for ' + (activeChat ? 'participant' : '') + '...</span></div>';
+    html += '</div>';
+    html += '</div>';
+    html += '<div class="call-info">';
+    html += '<p id="call-status">Connecting...</p>';
+    html += '<p id="call-timer">00:00</p>';
+    html += '</div>';
+    html += '<div class="call-controls">';
+    html += '<button class="call-btn" id="toggle-camera" onclick="toggleCamera()"><i class="fas fa-video"></i></button>';
+    html += '<button class="call-btn" id="toggle-mic" onclick="toggleMic()"><i class="fas fa-microphone"></i></button>';
+    html += '<button class="call-btn call-end" onclick="endVideoCall()"><i class="fas fa-phone-slash"></i></button>';
+    html += '</div></div></div>';
+    
+    document.body.insertAdjacentHTML('beforeend', html);
+}
+
+function toggleCamera() {
+    if (!videoStream) return;
+    
+    var videoTrack = videoStream.getVideoTracks()[0];
+    if (videoTrack) {
+        videoTrack.enabled = !videoTrack.enabled;
+        var btn = document.getElementById('toggle-camera');
+        btn.classList.toggle('disabled', !videoTrack.enabled);
+    }
+}
+
+function toggleMic() {
+    if (!videoStream) return;
+    
+    var audioTrack = videoStream.getAudioTracks()[0];
+    if (audioTrack) {
+        audioTrack.enabled = !audioTrack.enabled;
+        var btn = document.getElementById('toggle-mic');
+        btn.classList.toggle('disabled', !audioTrack.enabled);
+    }
+}
+
+function endVideoCall() {
+    // Stop all tracks
+    if (videoStream) {
+        videoStream.getTracks().forEach(function(track) { track.stop(); });
+        videoStream = null;
+    }
+    
+    // Stop timer
+    if (callTimer) {
+        clearInterval(callTimer);
+        callTimer = null;
+    }
+    
+    isVideoCallActive = false;
+    callSeconds = 0;
+    
+    // Remove overlay
+    var overlay = document.getElementById('video-call-overlay');
+    if (overlay) overlay.remove();
+    
+    showToast('Call ended', 'info');
+}
     
     if (isVideoCallActive) {
         showToast('Already in a call', 'info');

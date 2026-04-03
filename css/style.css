@@ -5242,3 +5242,22 @@ body {
 #video-call-btn:hover {
     color: #4CAF50;
 }
+
+/* Remote Participant Placeholder */
+.remote-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: rgba(255,255,255,0.5);
+}
+
+.remote-placeholder i {
+    font-size: 48px;
+    margin-bottom: 10px;
+}
+
+.remote-placeholder span {
+    font-size: 14px;
+}
